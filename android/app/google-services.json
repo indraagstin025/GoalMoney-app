@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "951546006102",
+    "project_id": "goalmoney-edab5",
+    "storage_bucket": "goalmoney-edab5.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:951546006102:android:048684568771d46833c9f7",
+        "android_client_info": {
+          "package_name": "com.android.application"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvJgzuKG2rBBGvtbfSVgTnQMM7ga_MtiU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
