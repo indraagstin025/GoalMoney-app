@@ -29,10 +29,16 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    Future.microtask(() {
+    Future.microtask(() async {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final goalProvider = Provider.of<GoalProvider>(context, listen: false);
-      goalProvider.fetchDashboardSummary();
-      goalProvider.fetchGoals();
+      
+      // Fetch both dashboard summary and user profile to get latest balance
+      await Future.wait([
+        goalProvider.fetchDashboardSummary(),
+        goalProvider.fetchGoals(),
+        authProvider.fetchProfile(),
+      ]);
     });
 
     _loadProfilePhoto();
@@ -97,7 +103,8 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      if (summary != null) _buildSummaryCard(summary, currency),
+                      if (summary != null)
+                        _buildSummaryCard(summary, currency, user),
 
                       const SizedBox(height: 32),
 
@@ -279,69 +286,33 @@ class _DashboardScreenState extends State<DashboardScreen>
   Widget _buildSummaryCard(
     Map<String, dynamic> summary,
     NumberFormat currency,
+    dynamic user,
   ) {
     final totalSaved = (summary['total_saved'] is num)
         ? (summary['total_saved'] as num).toDouble()
         : 0.0;
+    
+    // Safely parse available balance with robust fallback
+    double availableBalance = 0.0;
+    var val = summary['available_balance'] ?? summary['balance'];
+    if (val is num) {
+      availableBalance = val.toDouble();
+    } else if (val is String) {
+      availableBalance = double.tryParse(val) ?? 0.0;
+    }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.green.shade700, Colors.green.shade500],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.green.shade200.withOpacity(0.5),
-            blurRadius: 15,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.savings_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Total Savings',
-                style: TextStyle(color: Colors.white70, fontSize: 14),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Text(
-            currency.format(totalSaved),
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Keep up the good work!',
-            style: TextStyle(color: Colors.white70, fontSize: 13),
-          ),
-        ],
-      ),
+    // Fallback to user provider if summary is 0 but user has balance
+    if (availableBalance == 0 && user != null && user.availableBalance > 0) {
+      availableBalance = user.availableBalance;
+    }
+
+    return SummaryCard(
+      totalSaved: totalSaved,
+      availableBalance: availableBalance, // Pass to widget
+      overallProgress: (summary['overall_progress'] is num)
+          ? (summary['overall_progress'] as num).toDouble()
+          : 0.0,
+      currencyFormat: currency,
     );
   }
 

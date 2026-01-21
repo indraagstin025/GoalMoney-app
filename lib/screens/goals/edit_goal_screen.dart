@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../models/goal.dart';
 import '../../providers/goal_provider.dart';
@@ -15,18 +16,24 @@ class EditGoalScreen extends StatefulWidget {
 }
 
 class _EditGoalScreenState extends State<EditGoalScreen> {
+  final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameCtrl;
   late TextEditingController _targetCtrl;
   late TextEditingController _descCtrl;
   bool _isLoading = false;
   String? _goalPhotoPath;
+  final _currencyFormat = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: 'Rp ',
+    decimalDigits: 0,
+  );
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.goal.name);
     _targetCtrl = TextEditingController(
-      text: widget.goal.targetAmount.toString(),
+      text: widget.goal.targetAmount.toStringAsFixed(0),
     );
     _descCtrl = TextEditingController(text: widget.goal.description ?? '');
     _goalPhotoPath = widget.goal.photoPath;
@@ -48,35 +55,60 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
       if (photoPath != null && mounted) {
         setState(() => _goalPhotoPath = photoPath);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Foto produk berhasil diubah')),
+          const SnackBar(
+            content: Text('Foto goal berhasil diubah'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error: ${e.toString()}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
 
   void _submit() async {
-    if (_nameCtrl.text.isEmpty || _targetCtrl.text.isEmpty) return;
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     try {
-      final target = double.parse(_targetCtrl.text);
+      final target = double.parse(
+        _targetCtrl.text.replaceAll('.', '').replaceAll(',', ''),
+      );
       await Provider.of<GoalProvider>(context, listen: false).updateGoal(
         id: widget.goal.id,
         name: _nameCtrl.text,
         targetAmount: target,
         description: _descCtrl.text.isNotEmpty ? _descCtrl.text : null,
       );
-      if (mounted) Navigator.of(context).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Goal berhasil diupdate!'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+        Navigator.of(context).pop();
+      }
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Failed to update goal')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Gagal mengupdate goal'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -84,108 +116,495 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Edit Goal')),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              // Photo Preview
-              GestureDetector(
-                onTap: _pickGoalPhoto,
-                child: Container(
-                  width: 150,
-                  height: 150,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(8),
-                    image:
-                        _goalPhotoPath != null &&
-                            File(_goalPhotoPath!).existsSync()
-                        ? DecorationImage(
-                            image: FileImage(File(_goalPhotoPath!)),
-                            fit: BoxFit.cover,
-                          )
-                        : null,
-                  ),
-                  child:
-                      _goalPhotoPath != null &&
-                          File(_goalPhotoPath!).existsSync()
-                      ? null
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.image,
-                              size: 40,
-                              color: Colors.grey.shade400,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom Header
+            _buildCustomHeader(context, isDarkMode),
+
+            // Main Content
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 20),
+
+                      // Title
+                      Text(
+                        'Edit Goal ✏️',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.bold,
+                          color: Theme.of(context).textTheme.titleLarge?.color,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Perbarui informasi goal Anda',
+                        style: TextStyle(
+                          fontSize: 15,
+                          color: isDarkMode
+                              ? Colors.grey.shade400
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Photo Section
+                      Center(
+                        child: GestureDetector(
+                          onTap: _pickGoalPhoto,
+                          child: Container(
+                            width: 160,
+                            height: 160,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              gradient: _goalPhotoPath == null
+                                  ? LinearGradient(
+                                      colors: [
+                                        Colors.green.shade700,
+                                        Colors.green.shade500,
+                                      ],
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    )
+                                  : null,
+                              boxShadow: [
+                                BoxShadow(
+                                  color:
+                                      Colors.green.shade200.withOpacity(0.4),
+                                  blurRadius: 15,
+                                  offset: const Offset(0, 6),
+                                ),
+                              ],
+                              image: _goalPhotoPath != null &&
+                                      File(_goalPhotoPath!).existsSync()
+                                  ? DecorationImage(
+                                      image: FileImage(File(_goalPhotoPath!)),
+                                      fit: BoxFit.cover,
+                                    )
+                                  : null,
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Ubah Foto',
-                              style: TextStyle(
-                                color: Colors.grey.shade600,
-                                fontSize: 12,
+                            child: _goalPhotoPath == null ||
+                                    !File(_goalPhotoPath!).existsSync()
+                                ? Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Container(
+                                        padding: const EdgeInsets.all(16),
+                                        decoration: BoxDecoration(
+                                          color:
+                                              Colors.white.withOpacity(0.2),
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(
+                                          Icons.add_photo_alternate_rounded,
+                                          size: 40,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      const Text(
+                                        'Ubah Foto\nGoal',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  )
+                                : Stack(
+                                    children: [
+                                      Positioned(
+                                        bottom: 8,
+                                        right: 8,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(8),
+                                          decoration: BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: [
+                                                Colors.green.shade700,
+                                                Colors.green.shade500,
+                                              ],
+                                            ),
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: Colors.black
+                                                    .withOpacity(0.3),
+                                                blurRadius: 8,
+                                              ),
+                                            ],
+                                          ),
+                                          child: const Icon(
+                                            Icons.edit_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Goal Name Field
+                      Text(
+                        'Nama Goal',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _nameCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Contoh: Laptop Baru, Liburan, dll',
+                          prefixIcon: Icon(
+                            Icons.flag_rounded,
+                            color: Colors.lightGreen.shade700,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.lightGreen.shade700,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: isDarkMode
+                              ? Colors.grey.shade800.withOpacity(0.3)
+                              : Colors.grey.shade50,
+                        ),
+                        textCapitalization: TextCapitalization.words,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Nama goal tidak boleh kosong';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Target Amount Field
+                      Text(
+                        'Target Jumlah',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _targetCtrl,
+                        decoration: InputDecoration(
+                          hintText: '0',
+                          prefixIcon: Icon(
+                            Icons.attach_money_rounded,
+                            color: Colors.lightGreen.shade700,
+                          ),
+                          prefixText: 'Rp ',
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.lightGreen.shade700,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: isDarkMode
+                              ? Colors.grey.shade800.withOpacity(0.3)
+                              : Colors.grey.shade50,
+                        ),
+                        keyboardType: TextInputType.number,
+                        onChanged: (value) {
+                          if (value.isEmpty) return;
+                          final numericValue =
+                              value.replaceAll(RegExp('[^0-9]'), '');
+                          if (numericValue.isNotEmpty) {
+                            final formatted = _currencyFormat.format(
+                              int.parse(numericValue),
+                            );
+                            final cleanText =
+                                formatted.replaceAll('Rp ', '').trim();
+                            _targetCtrl.value = TextEditingValue(
+                              text: cleanText,
+                              selection: TextSelection.fromPosition(
+                                TextPosition(offset: cleanText.length),
+                              ),
+                            );
+                          }
+                        },
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Target jumlah tidak boleh kosong';
+                          }
+                          final numericValue =
+                              value.replaceAll(RegExp('[^0-9]'), '');
+                          if (numericValue.isEmpty ||
+                              int.parse(numericValue) <= 0) {
+                            return 'Target harus lebih dari 0';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Description Field
+                      Text(
+                        'Deskripsi (Opsional)',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).textTheme.bodyLarge?.color,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: _descCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'Tambahkan deskripsi goal Anda...',
+                          prefixIcon: Icon(
+                            Icons.description_outlined,
+                            color: Colors.lightGreen.shade700,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDarkMode
+                                  ? Colors.grey.shade700
+                                  : Colors.grey.shade300,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: Colors.lightGreen.shade700,
+                              width: 2,
+                            ),
+                          ),
+                          filled: true,
+                          fillColor: isDarkMode
+                              ? Colors.grey.shade800.withOpacity(0.3)
+                              : Colors.grey.shade50,
+                        ),
+                        maxLines: 3,
+                        textCapitalization: TextCapitalization.sentences,
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Action Buttons
+                      Row(
+                        children: [
+                          // Cancel Button
+                          Expanded(
+                            child: SizedBox(
+                              height: 56,
+                              child: OutlinedButton(
+                                onPressed: () => Navigator.of(context).pop(),
+                                style: OutlinedButton.styleFrom(
+                                  side: BorderSide(
+                                    color: Colors.grey.shade400,
+                                    width: 1.5,
+                                  ),
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: Text(
+                                  'Batal',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDarkMode
+                                        ? Colors.grey.shade300
+                                        : Colors.grey.shade700,
+                                  ),
+                                ),
                               ),
                             ),
-                          ],
-                        ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              TextField(
-                controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Goal Name',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _targetCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Target Amount',
-                  prefixText: 'Rp ',
-                  border: OutlineInputBorder(),
-                ),
-                keyboardType: TextInputType.number,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _descCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Description (Optional)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
+                          ),
+                          const SizedBox(width: 16),
+
+                          // Save Button
+                          Expanded(
+                            flex: 2,
+                            child: SizedBox(
+                              height: 56,
+                              child: _isLoading
+                                  ? Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.green.shade700,
+                                            Colors.green.shade500,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.green.shade700,
+                                            Colors.green.shade500,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.green.shade200
+                                                .withOpacity(0.5),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ElevatedButton(
+                                        onPressed: _submit,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Update Goal',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _submit,
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Update Goal'),
-                    ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Theme.of(context).cardTheme.color,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // GoalMoney Logo
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade700, Colors.green.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                ],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.savings_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'GoalMoney',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.lightGreen,
+                  letterSpacing: -0.5,
+                ),
               ),
             ],
           ),
-        ),
+
+          // Back Button
+          IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
       ),
     );
   }

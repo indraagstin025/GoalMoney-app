@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 
 import '../../providers/goal_provider.dart';
+import '../../providers/theme_provider.dart';
 import 'add_goal_screen.dart';
 import 'goal_detail_screen.dart';
 import 'edit_goal_screen.dart';
@@ -28,6 +29,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
   @override
   Widget build(BuildContext context) {
     final goalProvider = Provider.of<GoalProvider>(context);
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     final currency = NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp ',
@@ -35,145 +37,363 @@ class _GoalListScreenState extends State<GoalListScreen> {
     );
 
     return Scaffold(
-      backgroundColor: Colors.grey[50],
-      appBar: AppBar(
-        title: const Text('My Goals'),
-        centerTitle: true,
-        elevation: 0,
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await goalProvider.fetchGoals();
-        },
-        child: goalProvider.isLoading
-            ? const Center(child: CircularProgressIndicator())
-            : goalProvider.goals.isEmpty
-            ? _buildEmptyState()
-            : ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: goalProvider.goals.length,
-                itemBuilder: (context, index) {
-                  final goal = goalProvider.goals[index];
-                  return _buildGoalCard(context, goal, currency, goalProvider);
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Custom Header
+            _buildCustomHeader(context, isDarkMode),
+
+            // Main Content
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: () async {
+                  await goalProvider.fetchGoals();
                 },
+                child: goalProvider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : goalProvider.goals.isEmpty
+                        ? _buildEmptyState(isDarkMode)
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(20),
+                            itemCount: goalProvider.goals.length,
+                            itemBuilder: (context, index) {
+                              final goal = goalProvider.goals[index];
+                              return _buildGoalCard(
+                                context,
+                                goal,
+                                currency,
+                                goalProvider,
+                                isDarkMode,
+                              );
+                            },
+                          ),
               ),
+            ),
+          ],
+        ),
       ),
-      floatingActionButton: FloatingActionButton(
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.of(context).push(
             MaterialPageRoute(builder: (_) => const AddGoalScreen()),
           );
         },
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
+        label: const Text(
+          'Tambah Goal',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: Colors.green.shade700,
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+  Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Theme.of(context).cardTheme.color,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Icon(Icons.flag_rounded, size: 80, color: Colors.blue.shade100),
-          const SizedBox(height: 16),
-          const Text(
-            'No goals yet!',
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          // GoalMoney Logo
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade700, Colors.green.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.savings_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'GoalMoney',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.lightGreen,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Start your financial journey now.',
-            style: TextStyle(color: Colors.grey),
+
+          // Back Button
+          IconButton(
+            icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
+            onPressed: () => Navigator.pop(context),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildGoalCard(BuildContext context, dynamic goal, NumberFormat currency, dynamic goalProvider) {
+  Widget _buildEmptyState(bool isDarkMode) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.green.shade100.withOpacity(0.3),
+                  Colors.green.shade50.withOpacity(0.3),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.flag_rounded,
+              size: 80,
+              color: Colors.green.shade300,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            'Belum Ada Goal',
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).textTheme.titleLarge?.color,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Mulai perjalanan keuangan Anda sekarang\ndengan menambahkan goal pertama',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+            ),
+          ),
+          const SizedBox(height: 32),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AddGoalScreen()),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.green.shade700,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: const Icon(Icons.add_rounded, color: Colors.white),
+            label: const Text(
+              'Tambah Goal Pertama',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGoalCard(
+    BuildContext context,
+    dynamic goal,
+    NumberFormat currency,
+    dynamic goalProvider,
+    bool isDarkMode,
+  ) {
+    final progress = (goal.progress / 100).clamp(0.0, 1.0);
+    final isCompleted = progress >= 1.0;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isCompleted
+              ? Colors.green.shade300
+              : (isDarkMode ? Colors.grey.shade700 : Colors.grey.shade100),
+          width: isCompleted ? 2 : 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: isDarkMode
+                ? Colors.black.withOpacity(0.3)
+                : Colors.grey.shade200.withOpacity(0.5),
+            blurRadius: 15,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => GoalDetailScreen(goal: goal)),
             );
           },
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.all(20),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header Row
                 Row(
                   children: [
-                    // Icon/Image
+                    // Goal Image/Icon
                     Container(
-                      width: 50,
-                      height: 50,
+                      width: 64,
+                      height: 64,
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(12),
-                        image: goal.photoPath != null && File(goal.photoPath!).existsSync()
+                        borderRadius: BorderRadius.circular(16),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.green.shade700,
+                            Colors.green.shade500,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.green.shade200.withOpacity(0.4),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                        image: goal.photoPath != null &&
+                                File(goal.photoPath!).existsSync()
                             ? DecorationImage(
                                 image: FileImage(File(goal.photoPath!)),
                                 fit: BoxFit.cover,
                               )
                             : null,
                       ),
-                      child: goal.photoPath == null || !File(goal.photoPath!).existsSync()
-                          ? Icon(Icons.star_rounded, color: Colors.blue.shade300, size: 28)
+                      child: goal.photoPath == null ||
+                              !File(goal.photoPath!).existsSync()
+                          ? const Icon(
+                              Icons.star_rounded,
+                              color: Colors.white,
+                              size: 32,
+                            )
                           : null,
                     ),
                     const SizedBox(width: 16),
-                    // Title & Amount
+
+                    // Goal Name & Status
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            goal.name,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.black87
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  goal.name,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.color,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (isCompleted)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.green.shade600,
+                                        Colors.green.shade400,
+                                      ],
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        Icons.check_circle_rounded,
+                                        color: Colors.white,
+                                        size: 14,
+                                      ),
+                                      SizedBox(width: 4),
+                                      Text(
+                                        'Tercapai',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 6),
                           Text(
-                            '${currency.format(goal.currentAmount)} / ${currency.format(goal.targetAmount)}',
-                            style: const TextStyle(
+                            '${goal.progress.toStringAsFixed(1)}% dari target',
+                            style: TextStyle(
                               fontSize: 13,
-                              color: Colors.grey,
+                              color: isDarkMode
+                                  ? Colors.grey.shade400
+                                  : Colors.grey.shade600,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    // Actions
+
+                    // Actions Menu
                     PopupMenuButton(
-                      icon: Icon(Icons.more_vert_rounded, color: Colors.grey.shade400),
+                      icon: Icon(
+                        Icons.more_vert_rounded,
+                        color: isDarkMode
+                            ? Colors.grey.shade500
+                            : Colors.grey.shade400,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       itemBuilder: (context) => [
                         const PopupMenuItem(
                           value: 'deposit',
                           child: Row(
                             children: [
-                              Icon(Icons.add_circle_outline, color: Colors.green, size: 20),
-                              SizedBox(width: 8),
-                              Text('Deposit'),
+                              Icon(Icons.add_circle_outline,
+                                  color: Colors.green, size: 22),
+                              SizedBox(width: 12),
+                              Text(
+                                'Deposit',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
                             ],
                           ),
                         ),
@@ -181,9 +401,13 @@ class _GoalListScreenState extends State<GoalListScreen> {
                           value: 'edit',
                           child: Row(
                             children: [
-                              Icon(Icons.edit_outlined, color: Colors.blue, size: 20),
-                              SizedBox(width: 8),
-                              Text('Edit'),
+                              Icon(Icons.edit_outlined,
+                                  color: Colors.blue, size: 22),
+                              SizedBox(width: 12),
+                              Text(
+                                'Edit',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
                             ],
                           ),
                         ),
@@ -191,9 +415,13 @@ class _GoalListScreenState extends State<GoalListScreen> {
                           value: 'delete',
                           child: Row(
                             children: [
-                              Icon(Icons.delete_outline, color: Colors.red, size: 20),
-                              SizedBox(width: 8),
-                              Text('Delete'),
+                              Icon(Icons.delete_outline,
+                                  color: Colors.red, size: 22),
+                              SizedBox(width: 12),
+                              Text(
+                                'Hapus',
+                                style: TextStyle(fontWeight: FontWeight.w500),
+                              ),
                             ],
                           ),
                         ),
@@ -202,12 +430,17 @@ class _GoalListScreenState extends State<GoalListScreen> {
                         if (value == 'deposit') {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => DepositScreen(goalId: goal.id, goalName: goal.name),
+                              builder: (_) => DepositScreen(
+                                goalId: goal.id,
+                                goalName: goal.name,
+                              ),
                             ),
                           );
                         } else if (value == 'edit') {
                           Navigator.of(context).push(
-                            MaterialPageRoute(builder: (_) => EditGoalScreen(goal: goal)),
+                            MaterialPageRoute(
+                              builder: (_) => EditGoalScreen(goal: goal),
+                            ),
                           );
                         } else if (value == 'delete') {
                           _confirmDelete(context, goal, goalProvider);
@@ -216,16 +449,167 @@ class _GoalListScreenState extends State<GoalListScreen> {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
-                // Progress Bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: (goal.progress / 100).clamp(0.0, 1.0),
-                    backgroundColor: Colors.blue.shade50,
-                    valueColor: AlwaysStoppedAnimation(Colors.blue.shade400),
-                    minHeight: 6,
+
+                const SizedBox(height: 20),
+
+                // Amount Info
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDarkMode
+                        ? Colors.grey.shade900.withOpacity(0.5)
+                        : Colors.green.shade50.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDarkMode
+                          ? Colors.grey.shade700
+                          : Colors.green.shade100,
+                    ),
                   ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // Current Amount
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Terkumpul',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              currency.format(goal.currentAmount),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      // Divider
+                      Container(
+                        height: 40,
+                        width: 1,
+                        color: isDarkMode
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade300,
+                      ),
+
+                      // Target Amount
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              'Target',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              currency.format(goal.targetAmount),
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodyLarge
+                                    ?.color,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Progress Bar
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Progress',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: isDarkMode
+                                ? Colors.grey.shade400
+                                : Colors.grey.shade600,
+                          ),
+                        ),
+                        Text(
+                          '${goal.progress.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.green.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: isDarkMode
+                            ? Colors.grey.shade800
+                            : Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: Stack(
+                          children: [
+                            FractionallySizedBox(
+                              widthFactor: progress,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.green.shade600,
+                                      Colors.green.shade400,
+                                    ],
+                                    begin: Alignment.centerLeft,
+                                    end: Alignment.centerRight,
+                                  ),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.green.shade300
+                                          .withOpacity(0.5),
+                                      blurRadius: 4,
+                                      offset: const Offset(0, 2),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -235,26 +619,39 @@ class _GoalListScreenState extends State<GoalListScreen> {
     );
   }
 
-  void _confirmDelete(BuildContext context, dynamic goal, dynamic goalProvider) {
+  void _confirmDelete(
+      BuildContext context, dynamic goal, dynamic goalProvider) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Goal?'),
-        content: const Text('Are you sure you want to delete this goal and its transactions?'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text('Hapus Goal?'),
+        content: Text(
+          'Apakah Anda yakin ingin menghapus goal "${goal.name}" beserta semua transaksinya?',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: const Text('Batal'),
           ),
           TextButton(
             onPressed: () {
               goalProvider.deleteGoal(goal.id);
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Goal deleted successfully')),
+                const SnackBar(
+                  content: Text('Goal berhasil dihapus'),
+                  backgroundColor: Colors.green,
+                  behavior: SnackBarBehavior.floating,
+                ),
               );
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: const Text(
+              'Hapus',
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),

@@ -142,7 +142,7 @@ class GoalProvider with ChangeNotifier {
     }
   }
 
-  Future<void> addTransaction({
+  Future<Map<String, dynamic>> addTransaction({
     required int goalId,
     required double amount,
     String method = 'manual',
@@ -162,10 +162,47 @@ class GoalProvider with ChangeNotifier {
       if (response.statusCode == 201) {
         await fetchGoals();
         await fetchDashboardSummary();
+        
+        // Return the data which may include overflow info
+        return response.data['data'] ?? {};
       }
+      throw Exception('Unexpected response');
     } on DioException catch (e) {
       throw Exception(
         e.response?.data['message'] ?? 'Failed to add transaction',
+      );
+    }
+  }
+
+  Future<Map<String, dynamic>> allocateOverflow({
+    required List<Map<String, dynamic>> allocations,
+    double? saveToBalanceAmount,
+  }) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/transactions/allocate',
+        data: {
+          'allocations': allocations.map((a) => {
+            ...a,
+            'amount': (a['amount'] as num).toInt(),
+          }).toList(),
+          if (saveToBalanceAmount != null) ...{
+            'save_to_balance_amount': saveToBalanceAmount.toInt(),
+            'save_remaining_as_balance': true,
+          },
+        },
+      );
+
+      if (response.statusCode == 200) {
+        await fetchGoals();
+        await fetchDashboardSummary();
+        
+        return response.data['data'] ?? {};
+      }
+      throw Exception('Unexpected response');
+    } on DioException catch (e) {
+      throw Exception(
+        e.response?.data['message'] ?? 'Failed to allocate overflow',
       );
     }
   }

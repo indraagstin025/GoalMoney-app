@@ -130,6 +130,7 @@ class AuthProvider with ChangeNotifier {
           id: _user!.id,
           name: name ?? _user!.name,
           email: email ?? _user!.email,
+          availableBalance: _user!.availableBalance,
         );
         notifyListeners();
       }
@@ -137,6 +138,18 @@ class AuthProvider with ChangeNotifier {
       print('[AuthProvider] Profile updated locally: name=$name, email=$email');
     } catch (e) {
       throw Exception('Failed to update profile: $e');
+    }
+  }
+
+  void setAvailableBalance(double amount) {
+    if (_user != null) {
+      _user = User(
+        id: _user!.id,
+        name: _user!.name,
+        email: _user!.email,
+        availableBalance: amount,
+      );
+      notifyListeners();
     }
   }
   
@@ -151,6 +164,7 @@ class AuthProvider with ChangeNotifier {
         id: _user!.id,
         name: savedName ?? _user!.name,
         email: savedEmail ?? _user!.email,
+        availableBalance: _user!.availableBalance,
       );
       print('[AuthProvider] Loaded local profile overrides');
     }
