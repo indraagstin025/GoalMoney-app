@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/goal_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/validators.dart';
 import '../../models/goal.dart';
 
@@ -33,6 +34,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     'bank_transfer': Icons.account_balance,
     'ovo': Icons.wallet,
     'shopeepay': Icons.shopping_bag,
+    'manual': Icons.money_rounded,
   };
 
   bool _isLoading = false;
@@ -85,6 +87,13 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
           if (provider.goals.isNotEmpty) {
             _selectedGoalId = provider.goals.first.id;
             _selectedGoalBalance = provider.goals.first.currentAmount;
+            
+            // Set method based on goal type
+            if (provider.goals.first.type == 'cash') {
+              _selectedMethod = 'manual';
+            } else {
+              _selectedMethod = 'dana';
+            }
           }
         });
       }
@@ -96,17 +105,20 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_selectedGoalId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Pilih goal terlebih dahulu'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      return;
-    }
-
+    // Check if goal is selected OR explicitly null (Available Balance)
+    // Actually _selectedGoalId being null is now valid for Balance.
+    // However, we rely on the dropdown to set it.
+    // If it's valid to be null, we remove this check OR adjust it.
+    
+    // BUT wait, init/fetch sets it to first goal.
+    // So distinct null vs "not set" is tricky if "not set" is null.
+    // But in our dropdown we explicitly set value: null.
+    
+    // Let's assume if it is null, it means Available Balance because we default select first goal if available.
+    // If no goals available, it stays null?
+    
+    // Ideally we should have a flag or just trust the selection.
+    
     setState(() => _isLoading = true);
 
     try {
@@ -115,12 +127,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
 
       // Validasi saldo goal yang dipilih
       if (amount > _selectedGoalBalance) {
-        throw Exception('Saldo goal tidak mencukupi');
+        throw Exception('Saldo tidak mencukupi');
       }
 
-      // Send withdrawal request to backend with goalId
+      // Send withdrawal request to backend with goalId (nullable)
       await Provider.of<GoalProvider>(context, listen: false).requestWithdrawal(
-        goalId: _selectedGoalId!,
+        goalId: _selectedGoalId,
         amount: amount,
         method: _selectedMethod,
         accountNumber: _accountCtrl.text,
@@ -492,7 +504,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
 
             // Goal Selection
             Text(
-              'Pilih Goal',
+              'Pilih Sumber Dana',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
@@ -500,13 +512,16 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
               ),
             ),
             const SizedBox(height: 8),
-            Consumer<GoalProvider>(
-              builder: (context, goalProvider, _) {
+            Consumer2<GoalProvider, AuthProvider>(
+              builder: (context, goalProvider, authProvider, _) {
                 final goals = goalProvider.goals;
-                return DropdownButtonFormField<int>(
+                final availableBalance = authProvider.user?.availableBalance ?? 0;
+                
+                return DropdownButtonFormField<int?>(
+                  isExpanded: true,
                   value: _selectedGoalId,
                   decoration: InputDecoration(
-                    hintText: 'Pilih goal untuk ditarik',
+                    hintText: 'Pilih sumber dana',
                     prefixIcon: Icon(
                       Icons.savings_outlined,
                       color: Colors.lightGreen.shade700,
@@ -539,58 +554,80 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                         ? Colors.grey.shade800.withOpacity(0.3)
                         : Colors.grey.shade50,
                   ),
-                  items: goals.map((goal) {
-                    return DropdownMenuItem(
-                      value: goal.id,
+                  items: [
+                    // Available Balance Option
+                    DropdownMenuItem<int?>(
+                      value: null, // null represents Available Balance
                       child: Text(
-                        '${goal.name} (${_currencyFormat.format(goal.currentAmount)})',
+                        '📦 Saldo Akun (${_currencyFormat.format(availableBalance)})',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
-                    );
-                  }).toList(),
+                    ),
+                    // Goal Options
+                    ...goals.map((goal) {
+                      return DropdownMenuItem<int?>(
+                        value: goal.id,
+                        child: Text(
+                          '${goal.name} (${_currencyFormat.format(goal.currentAmount)})',
+                        ),
+                      );
+                    }).toList(),
+                  ],
                   onChanged: (val) {
                     setState(() {
                       _selectedGoalId = val;
-                      final selectedGoal = goals.firstWhere((g) => g.id == val);
-                      _selectedGoalBalance = selectedGoal.currentAmount;
+                      if (val == null) {
+                         _selectedGoalBalance = availableBalance;
+                         if (_selectedMethod == 'manual') _selectedMethod = 'dana';
+                      } else {
+                         final selectedGoal = goals.firstWhere((g) => g.id == val);
+                         _selectedGoalBalance = selectedGoal.currentAmount;
+                         if (selectedGoal.type == 'cash') {
+                            _selectedMethod = 'manual';
+                         } else if (_selectedMethod == 'manual') {
+                            _selectedMethod = 'dana';
+                         }
+                      }
                     });
                   },
-                  validator: (val) => val == null ? 'Pilih goal' : null,
                 );
               },
             ),
             const SizedBox(height: 12),
-
+ 
             // Selected Goal Balance Info
-            if (_selectedGoalId != null)
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isDarkMode
-                      ? Colors.green.shade900.withOpacity(0.3)
-                      : Colors.green.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.green.shade300,
-                  ),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isDarkMode
+                    ? Colors.green.shade900.withOpacity(0.3)
+                    : Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.green.shade300,
                 ),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Colors.green.shade700,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Saldo Goal: ${_currencyFormat.format(_selectedGoalBalance)}',
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    color: Colors.green.shade700,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Saldo Tersedia: ${_currencyFormat.format(_selectedGoalBalance)}',
                       style: TextStyle(
                         color: Colors.green.shade700,
                         fontWeight: FontWeight.w600,
                       ),
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
             const SizedBox(height: 20),
 
             // Withdrawal Method
@@ -603,56 +640,74 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
               ),
             ),
             const SizedBox(height: 8),
-            DropdownButtonFormField<String>(
-              value: _selectedMethod,
-              decoration: InputDecoration(
-                hintText: 'Pilih metode penarikan',
-                prefixIcon: Icon(
-                  _methodIcons[_selectedMethod],
-                  color: Colors.lightGreen.shade700,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDarkMode
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDarkMode
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.lightGreen.shade700,
-                    width: 2,
-                  ),
-                ),
-                filled: true,
-                fillColor: isDarkMode
-                    ? Colors.grey.shade800.withOpacity(0.3)
-                    : Colors.grey.shade50,
+              // Method Dropdown filtered by Goal Type
+              Builder(
+                builder: (context) {
+                   // Calculate allowed methods
+                   final allowedMethods = _methodIcons.keys.where((m) {
+                      if (_selectedGoalId == null) return m != 'manual';
+                      try {
+                         final goal = Provider.of<GoalProvider>(context, listen: false)
+                             .goals.firstWhere((g) => g.id == _selectedGoalId);
+                         if (goal.type == 'cash') return m == 'manual';
+                         return m != 'manual';
+                      } catch (e) {
+                         return true; 
+                      }
+                   }).toList();
+
+                   return DropdownButtonFormField<String>(
+                    value: _selectedMethod,
+                    decoration: InputDecoration(
+                      hintText: 'Pilih metode penarikan',
+                      prefixIcon: Icon(
+                        _methodIcons[_selectedMethod] ?? Icons.payment,
+                        color: Colors.lightGreen.shade700,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDarkMode
+                              ? Colors.grey.shade700
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: isDarkMode
+                              ? Colors.grey.shade700
+                              : Colors.grey.shade300,
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(
+                          color: Colors.lightGreen.shade700,
+                          width: 2,
+                        ),
+                      ),
+                      filled: true,
+                      fillColor: isDarkMode
+                          ? Colors.grey.shade800.withOpacity(0.3)
+                          : Colors.grey.shade50,
+                    ),
+                    items: allowedMethods.map((m) {
+                      return DropdownMenuItem(
+                        value: m,
+                        child: Row(
+                          children: [
+                            Icon(_methodIcons[m], size: 20),
+                            const SizedBox(width: 12),
+                            Text(m.toUpperCase().replaceAll('_', ' ')),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) => setState(() => _selectedMethod = val!),
+                  );
+                }
               ),
-              items: _methodIcons.keys.map((m) {
-                return DropdownMenuItem(
-                  value: m,
-                  child: Row(
-                    children: [
-                      Icon(_methodIcons[m], size: 20),
-                      const SizedBox(width: 12),
-                      Text(m.toUpperCase().replaceAll('_', ' ')),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (val) => setState(() => _selectedMethod = val!),
-            ),
             const SizedBox(height: 20),
 
             // Account Number

@@ -21,11 +21,14 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     symbol: 'Rp ',
     decimalDigits: 0,
   );
-  final _dateFormat = DateFormat('dd MMM yyyy, HH:mm');
+  
+  File? _goalImage;
+  bool _imageExists = false;
 
   @override
   void initState() {
     super.initState();
+    _checkImage();
     Future.microtask(
       () => Provider.of<TransactionProvider>(
         context,
@@ -35,17 +38,40 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   }
 
   @override
+  void didUpdateWidget(GoalDetailScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.goal.photoPath != widget.goal.photoPath) {
+      _checkImage();
+    }
+  }
+
+  void _checkImage() {
+    if (widget.goal.photoPath != null) {
+      final file = File(widget.goal.photoPath!);
+      final exists = file.existsSync(); // Done once on init/update
+      setState(() {
+        _imageExists = exists;
+        _goalImage = exists ? file : null;
+      });
+    } else {
+      setState(() {
+        _imageExists = false;
+        _goalImage = null;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final transactionProvider = Provider.of<TransactionProvider>(context);
-
+    
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
             // Custom Header
-            _buildCustomHeader(context, isDarkMode),
+            _CustomHeader(goal: widget.goal, isDarkMode: isDarkMode),
 
             // Main Content
             Expanded(
@@ -58,260 +84,111 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                   await Provider.of<GoalProvider>(context, listen: false)
                       .fetchGoals();
                 },
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  child: Column(
-                    children: [
-                      const SizedBox(height: 20),
+                child: Consumer<TransactionProvider>(
+                  builder: (context, transactionProvider, _) {
+                    return SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Column(
+                        children: [
+                          const SizedBox(height: 20),
 
-                      // Goal Image/Photo
-                      if (widget.goal.photoPath != null &&
-                          File(widget.goal.photoPath!).existsSync())
-                        Center(
-                          child: Container(
-                            width: 120,
-                            height: 120,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.green.shade200.withOpacity(0.4),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                              image: DecorationImage(
-                                image: FileImage(File(widget.goal.photoPath!)),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(height: 24),
-
-                      // Balance Card
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Container(
-                          padding: const EdgeInsets.all(24),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.green.shade700,
-                                Colors.green.shade500,
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.green.shade200.withOpacity(0.5),
-                                blurRadius: 15,
-                                offset: const Offset(0, 6),
-                              ),
-                            ],
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                'Saldo Saat Ini',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.9),
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                _currencyFormat.format(widget.goal.currentAmount),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Progress Bar
-                              Column(
-                                children: [
-                                  Row(
-                                    mainAxisAlignment:
-                                        MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      Text(
-                                        'Progress',
-                                        style: TextStyle(
-                                          color: Colors.white.withOpacity(0.9),
-                                          fontSize: 12,
-                                        ),
-                                      ),
-                                      Text(
-                                        '${widget.goal.progress.toStringAsFixed(1)}%',
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 8),
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
-                                    child: LinearProgressIndicator(
-                                      value: widget.goal.progress / 100,
-                                      minHeight: 12,
-                                      backgroundColor:
-                                          Colors.white.withOpacity(0.3),
-                                      valueColor:
-                                          const AlwaysStoppedAnimation<Color>(
-                                              Colors.white),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 16),
-
-                              // Target Info
-                              Container(
-                                padding: const EdgeInsets.all(12),
+                          // Goal Image/Photo
+                          if (_imageExists && _goalImage != null)
+                            Center(
+                              child: Container(
+                                width: 120,
+                                height: 120,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Row(
-                                  mainAxisAlignment:
-                                      MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      'Target',
-                                      style: TextStyle(
-                                        color: Colors.white.withOpacity(0.9),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    Text(
-                                      _currencyFormat.format(
-                                          widget.goal.targetAmount),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 16,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                  borderRadius: BorderRadius.circular(20),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.green.shade200.withOpacity(0.4),
+                                      blurRadius: 15,
+                                      offset: const Offset(0, 6),
                                     ),
                                   ],
+                                  image: DecorationImage(
+                                    image: FileImage(_goalImage!),
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
-                            ],
+                            ),
+                          const SizedBox(height: 24),
+
+                          // Balance Card
+                          _BalanceCard(
+                            goal: widget.goal,
+                            currencyFormat: _currencyFormat,
                           ),
-                        ),
-                      ),
-                      const SizedBox(height: 32),
+                          const SizedBox(height: 32),
 
-                      // Transaction History Header
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.history_rounded,
-                              color: Colors.green.shade700,
-                              size: 24,
+                          // Transaction History Header
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.history_rounded,
+                                  color: Colors.green.shade700,
+                                  size: 24,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Riwayat Transaksi',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context)
+                                        .textTheme
+                                        .titleLarge
+                                        ?.color,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Text(
-                              'Riwayat Transaksi',
-                              style: TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.color,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
+                          ),
+                          const SizedBox(height: 16),
 
-                      // Transaction List
-                      transactionProvider.isLoading
-                          ? const Padding(
+                          // Transaction List
+                          if (transactionProvider.isLoading)
+                            const Padding(
                               padding: EdgeInsets.all(40),
                               child: CircularProgressIndicator(
                                 color: Colors.green,
                               ),
                             )
-                          : transactionProvider.transactions.isEmpty
-                              ? Padding(
-                                  padding: const EdgeInsets.all(40),
-                                  child: Column(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(24),
-                                        decoration: BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [
-                                              Colors.grey.shade100
-                                                  .withOpacity(0.3),
-                                              Colors.grey.shade50
-                                                  .withOpacity(0.3),
-                                            ],
-                                          ),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: Icon(
-                                          Icons.receipt_long_rounded,
-                                          size: 64,
-                                          color: Colors.grey.shade400,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 16),
-                                      Text(
-                                        'Belum ada transaksi',
-                                        style: TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDarkMode
-                                              ? Colors.grey.shade400
-                                              : Colors.grey.shade600,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              : ListView.separated(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 24, vertical: 8),
-                                  itemCount:
-                                      transactionProvider.transactions.length,
-                                  separatorBuilder: (_, __) =>
-                                      const SizedBox(height: 12),
-                                  itemBuilder: (context, index) {
-                                    final transaction = transactionProvider
-                                        .transactions[index];
-                                    return _buildTransactionCard(
-                                      transaction.description ?? 'Deposit',
-                                      transaction.amount,
-                                      DateTime.parse(
-                                          transaction.transactionDate),
-                                      isDarkMode,
-                                      onLongPress: () => _showDeleteDialog(
-                                        context,
-                                        transaction.id,
-                                        transactionProvider,
-                                      ),
-                                    );
-                                  },
-                                ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
+                          else if (transactionProvider.transactions.isEmpty)
+                             _EmptyTransactionState(isDarkMode: isDarkMode)
+                          else
+                            ListView.separated(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 24, vertical: 8),
+                              itemCount:
+                                  transactionProvider.transactions.length,
+                              separatorBuilder: (_, __) =>
+                                  const SizedBox(height: 12),
+                              itemBuilder: (context, index) {
+                                final transaction = transactionProvider
+                                    .transactions[index];
+                                return TransactionCard(
+                                  key: ValueKey(transaction.id),
+                                  description: transaction.description ?? 'Deposit',
+                                  amount: transaction.amount,
+                                  date: DateTime.parse(transaction.transactionDate),
+                                  isDarkMode: isDarkMode,
+                                  transactionId: transaction.id,
+                                  goalId: widget.goal.id,
+                                );
+                              },
+                            ),
+                          const SizedBox(height: 24),
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -320,8 +197,20 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
       ),
     );
   }
+}
 
-  Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
+class _CustomHeader extends StatelessWidget {
+  final Goal goal;
+  final bool isDarkMode;
+
+  const _CustomHeader({
+    Key? key,
+    required this.goal,
+    required this.isDarkMode,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       color: Theme.of(context).cardTheme.color,
@@ -340,7 +229,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  widget.goal.name,
+                  goal.name,
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -348,10 +237,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (widget.goal.description != null &&
-                    widget.goal.description!.isNotEmpty)
+                if (goal.description != null &&
+                    goal.description!.isNotEmpty)
                   Text(
-                    widget.goal.description!,
+                    goal.description!,
                     style: TextStyle(
                       fontSize: 13,
                       color:
@@ -385,16 +274,210 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
       ),
     );
   }
+}
 
-  Widget _buildTransactionCard(
-    String description,
-    double amount,
-    DateTime date,
-    bool isDarkMode, {
-    VoidCallback? onLongPress,
-  }) {
+class _BalanceCard extends StatelessWidget {
+  final Goal goal;
+  final NumberFormat currencyFormat;
+
+  const _BalanceCard({
+    Key? key,
+    required this.goal,
+    required this.currencyFormat,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.green.shade700,
+              Colors.green.shade500,
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.shade200.withOpacity(0.5),
+              blurRadius: 15,
+              offset: const Offset(0, 6),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Text(
+              'Saldo Saat Ini',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              currencyFormat.format(goal.currentAmount),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 32,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            // Progress Bar
+            Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Progress',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 12,
+                      ),
+                    ),
+                    Text(
+                      '${goal.progress.toStringAsFixed(1)}%',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: LinearProgressIndicator(
+                    value: goal.progress / 100,
+                    minHeight: 12,
+                    backgroundColor: Colors.white.withOpacity(0.3),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Target Info
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Target',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                    ),
+                  ),
+                  Text(
+                    currencyFormat.format(goal.targetAmount),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyTransactionState extends StatelessWidget {
+  final bool isDarkMode;
+
+  const _EmptyTransactionState({Key? key, required this.isDarkMode}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(40),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.grey.shade100.withOpacity(0.3),
+                  Colors.grey.shade50.withOpacity(0.3),
+                ],
+              ),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.receipt_long_rounded,
+              size: 64,
+              color: Colors.grey.shade400,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Belum ada transaksi',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: isDarkMode
+                  ? Colors.grey.shade400
+                  : Colors.grey.shade600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class TransactionCard extends StatelessWidget {
+  final String description;
+  final double amount;
+  final DateTime date;
+  final bool isDarkMode;
+  final int transactionId;
+  final int goalId;
+
+  const TransactionCard({
+    Key? key,
+    required this.description,
+    required this.amount,
+    required this.date,
+    required this.isDarkMode,
+    required this.transactionId,
+    required this.goalId,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final currencyFormat = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
+
     return GestureDetector(
-      onLongPress: onLongPress,
+      onLongPress: () => _showDeleteDialog(context),
       child: Container(
         decoration: BoxDecoration(
           color: isDarkMode ? Colors.grey.shade800 : Colors.white,
@@ -448,7 +531,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      _dateFormat.format(date),
+                      dateFormat.format(date),
                       style: TextStyle(
                         color: isDarkMode
                             ? Colors.grey.shade400
@@ -462,7 +545,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
 
               // Amount
               Text(
-                '+ ${_currencyFormat.format(amount)}',
+                '+ ${currencyFormat.format(amount)}',
                 style: TextStyle(
                   color: Colors.green.shade700,
                   fontWeight: FontWeight.bold,
@@ -476,11 +559,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     );
   }
 
-  void _showDeleteDialog(
-    BuildContext context,
-    int transactionId,
-    TransactionProvider transactionProvider,
-  ) {
+  void _showDeleteDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -505,11 +584,12 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
+              final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
               await transactionProvider.deleteTransaction(
                 transactionId,
-                widget.goal.id,
+                goalId,
               );
-              if (mounted) {
+              if (context.mounted) {
                 Provider.of<GoalProvider>(context, listen: false).fetchGoals();
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(

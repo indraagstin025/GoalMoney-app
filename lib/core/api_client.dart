@@ -17,14 +17,13 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final prefs = await SharedPreferences.getInstance();
-          final token = prefs.getString('token'); // Fixed typo: finaltoken -> final token
+          final token = prefs.getString('token'); 
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
           }
           return handler.next(options);
         },
         onError: (DioException e, handler) {
-          // Handle 401 Unauthorized globally if needed (e.g. logout)
           return handler.next(e);
         },
       ),

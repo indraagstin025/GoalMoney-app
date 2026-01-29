@@ -33,37 +33,33 @@ class GoalProvider with ChangeNotifier {
       final response = await _apiClient.dio.get('/goals/index');
       if (response.statusCode == 200) {
         final List data = response.data['data'];
-        _goals = data.map((json) => Goal.fromJson(json)).toList();
-        print('[GoalProvider] Fetched ${_goals.length} goals');
+        final tempGoals = data.map((json) => Goal.fromJson(json)).toList();
+        
+        print('[GoalProvider] Fetched ${tempGoals.length} goals. Loading images in parallel...');
 
-        // Load photo paths for each goal
-        for (var i = 0; i < _goals.length; i++) {
+        // Load photo paths in parallel
+        final goalsWithPhotos = await Future.wait(tempGoals.map((goal) async {
           try {
-            final photoPath = await PhotoStorageService.getGoalPhotoPath(
-              _goals[i].id,
-            );
-            print(
-              '[GoalProvider] Goal ${_goals[i].id}: photoPath = $photoPath',
-            );
-
+            final photoPath = await PhotoStorageService.getGoalPhotoPath(goal.id);
             if (photoPath != null) {
-              _goals[i] = Goal(
-                id: _goals[i].id,
-                name: _goals[i].name,
-                targetAmount: _goals[i].targetAmount,
-                currentAmount: _goals[i].currentAmount,
-                deadline: _goals[i].deadline,
-                description: _goals[i].description,
-                progressPercentage: _goals[i].progressPercentage,
+              return Goal(
+                id: goal.id,
+                name: goal.name,
+                targetAmount: goal.targetAmount,
+                currentAmount: goal.currentAmount,
+                deadline: goal.deadline,
+                description: goal.description,
+                progressPercentage: goal.progressPercentage,
                 photoPath: photoPath,
               );
             }
           } catch (e) {
-            print(
-              '[GoalProvider] Error loading photo for goal ${_goals[i].id}: $e',
-            );
+            print('[GoalProvider] Error loading photo for goal ${goal.id}: $e');
           }
-        }
+          return goal; 
+        }));
+
+        _goals = goalsWithPhotos;
       }
     } catch (e) {
       print('[GoalProvider] Error fetching goals: $e');
@@ -78,6 +74,7 @@ class GoalProvider with ChangeNotifier {
     required double targetAmount,
     String? deadline,
     String? description,
+    String type = 'digital',
   }) async {
     try {
       final response = await _apiClient.dio.post(
@@ -85,6 +82,7 @@ class GoalProvider with ChangeNotifier {
         data: {
           'name': name,
           'target_amount': targetAmount,
+          'type': type,
           if (deadline != null) 'deadline': deadline,
           if (description != null) 'description': description,
         },
@@ -99,8 +97,12 @@ class GoalProvider with ChangeNotifier {
           print('[GoalProvider] New goal created with ID: $goalId');
         }
 
-        await fetchGoals();
-        await fetchDashboardSummary();
+        // Parallel refresh
+        await Future.wait([
+          fetchGoals(),
+          fetchDashboardSummary(),
+        ]);
+        
         return goalId;
       }
     } on DioException catch (e) {
@@ -124,8 +126,12 @@ class GoalProvider with ChangeNotifier {
       if (description != null) data['description'] = description;
 
       await _apiClient.dio.put('/goals/update', data: data);
-      await fetchGoals();
-      await fetchDashboardSummary();
+      
+      // Parallel refresh
+      await Future.wait([
+        fetchGoals(),
+        fetchDashboardSummary(),
+      ]);
     } on DioException catch (e) {
       throw Exception(e.response?.data['message'] ?? 'Failed to update goal');
     }
@@ -160,12 +166,16 @@ class GoalProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        await fetchGoals();
-        await fetchDashboardSummary();
+        // Parallel refresh
+        await Future.wait([
+          fetchGoals(),
+          fetchDashboardSummary(),
+        ]);
         
         // Return the data which may include overflow info
         return response.data['data'] ?? {};
       }
+
       throw Exception('Unexpected response');
     } on DioException catch (e) {
       throw Exception(
@@ -233,20 +243,20 @@ class GoalProvider with ChangeNotifier {
 
   // ===== WITHDRAWAL METHODS =====
 
-  /// Request withdrawal from a specific goal
+  /// Request withdrawal from a specific goal or available balance
   Future<void> requestWithdrawal({
-    required int goalId,
+    int? goalId,
     required double amount,
     required String method,
     String? accountNumber,
     String? notes,
   }) async {
     try {
-      print('[GoalProvider] Requesting withdrawal of $amount from goal $goalId via $method');
+      print('[GoalProvider] Requesting withdrawal of $amount from ${goalId != null ? "goal $goalId" : "Available Balance"} via $method');
       final response = await _apiClient.dio.post(
         '/withdrawals/request',
         data: {
-          'goal_id': goalId,
+          if (goalId != null) 'goal_id': goalId,
           'amount': amount,
           'method': method,
           if (accountNumber != null) 'account_number': accountNumber,

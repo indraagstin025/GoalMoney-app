@@ -83,12 +83,15 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
       final target = double.parse(
         _targetCtrl.text.replaceAll('.', '').replaceAll(',', ''),
       );
+      
+      // Use listen: false for the provider call inside a method
       await Provider.of<GoalProvider>(context, listen: false).updateGoal(
         id: widget.goal.id,
         name: _nameCtrl.text,
         targetAmount: target,
         description: _descCtrl.text.isNotEmpty ? _descCtrl.text : null,
       );
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -124,7 +127,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
         child: Column(
           children: [
             // Custom Header
-            _buildCustomHeader(context, isDarkMode),
+            const _CustomHeader(),
 
             // Main Content
             Expanded(
@@ -160,152 +163,20 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
 
                       // Photo Section
                       Center(
-                        child: GestureDetector(
+                        child: _GoalPhotoPicker(
+                          photoPath: _goalPhotoPath,
                           onTap: _pickGoalPhoto,
-                          child: Container(
-                            width: 160,
-                            height: 160,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              gradient: _goalPhotoPath == null
-                                  ? LinearGradient(
-                                      colors: [
-                                        Colors.green.shade700,
-                                        Colors.green.shade500,
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    )
-                                  : null,
-                              boxShadow: [
-                                BoxShadow(
-                                  color:
-                                      Colors.green.shade200.withOpacity(0.4),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 6),
-                                ),
-                              ],
-                              image: _goalPhotoPath != null &&
-                                      File(_goalPhotoPath!).existsSync()
-                                  ? DecorationImage(
-                                      image: FileImage(File(_goalPhotoPath!)),
-                                      fit: BoxFit.cover,
-                                    )
-                                  : null,
-                            ),
-                            child: _goalPhotoPath == null ||
-                                    !File(_goalPhotoPath!).existsSync()
-                                ? Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.all(16),
-                                        decoration: BoxDecoration(
-                                          color:
-                                              Colors.white.withOpacity(0.2),
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.add_photo_alternate_rounded,
-                                          size: 40,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 12),
-                                      const Text(
-                                        'Ubah Foto\nGoal',
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : Stack(
-                                    children: [
-                                      Positioned(
-                                        bottom: 8,
-                                        right: 8,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(8),
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                Colors.green.shade700,
-                                                Colors.green.shade500,
-                                              ],
-                                            ),
-                                            shape: BoxShape.circle,
-                                            boxShadow: [
-                                              BoxShadow(
-                                                color: Colors.black
-                                                    .withOpacity(0.3),
-                                                blurRadius: 8,
-                                              ),
-                                            ],
-                                          ),
-                                          child: const Icon(
-                                            Icons.edit_rounded,
-                                            color: Colors.white,
-                                            size: 20,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                          ),
                         ),
                       ),
                       const SizedBox(height: 32),
 
                       // Goal Name Field
-                      Text(
-                        'Nama Goal',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
+                      _InputField(
+                        label: 'Nama Goal',
                         controller: _nameCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Contoh: Laptop Baru, Liburan, dll',
-                          prefixIcon: Icon(
-                            Icons.flag_rounded,
-                            color: Colors.lightGreen.shade700,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.lightGreen.shade700,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                              ? Colors.grey.shade800.withOpacity(0.3)
-                              : Colors.grey.shade50,
-                        ),
+                        hint: 'Contoh: Laptop Baru, Liburan, dll',
+                        icon: Icons.flag_rounded,
+                        isDarkMode: isDarkMode,
                         textCapitalization: TextCapitalization.words,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -317,52 +188,13 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       const SizedBox(height: 20),
 
                       // Target Amount Field
-                      Text(
-                        'Target Jumlah',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
+                      _InputField(
+                        label: 'Target Jumlah',
                         controller: _targetCtrl,
-                        decoration: InputDecoration(
-                          hintText: '0',
-                          prefixIcon: Icon(
-                            Icons.attach_money_rounded,
-                            color: Colors.lightGreen.shade700,
-                          ),
-                          prefixText: 'Rp ',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.lightGreen.shade700,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                              ? Colors.grey.shade800.withOpacity(0.3)
-                              : Colors.grey.shade50,
-                        ),
+                        hint: '0',
+                        icon: Icons.attach_money_rounded,
+                        isDarkMode: isDarkMode,
+                        prefixText: 'Rp ',
                         keyboardType: TextInputType.number,
                         onChanged: (value) {
                           if (value.isEmpty) return;
@@ -398,51 +230,12 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       const SizedBox(height: 20),
 
                       // Description Field
-                      Text(
-                        'Deskripsi (Opsional)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
+                      _InputField(
+                        label: 'Deskripsi (Opsional)',
                         controller: _descCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Tambahkan deskripsi goal Anda...',
-                          prefixIcon: Icon(
-                            Icons.description_outlined,
-                            color: Colors.lightGreen.shade700,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.lightGreen.shade700,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                              ? Colors.grey.shade800.withOpacity(0.3)
-                              : Colors.grey.shade50,
-                        ),
+                        hint: 'Tambahkan deskripsi goal Anda...',
+                        icon: Icons.description_outlined,
+                        isDarkMode: isDarkMode,
                         maxLines: 3,
                         textCapitalization: TextCapitalization.sentences,
                       ),
@@ -559,8 +352,13 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
       ),
     );
   }
+}
 
-  Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
+class _CustomHeader extends StatelessWidget {
+  const _CustomHeader({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       color: Theme.of(context).cardTheme.color,
@@ -606,6 +404,201 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _GoalPhotoPicker extends StatelessWidget {
+  final String? photoPath;
+  final VoidCallback onTap;
+
+  const _GoalPhotoPicker({
+    Key? key,
+    required this.photoPath,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final hasPhoto = photoPath != null && File(photoPath!).existsSync();
+
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 160,
+        height: 160,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient: !hasPhoto
+              ? LinearGradient(
+                  colors: [
+                    Colors.green.shade700,
+                    Colors.green.shade500,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.green.shade200.withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 6),
+            ),
+          ],
+          image: hasPhoto
+              ? DecorationImage(
+                  image: FileImage(File(photoPath!)),
+                  fit: BoxFit.cover,
+                )
+              : null,
+        ),
+        child: !hasPhoto
+            ? Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.add_photo_alternate_rounded,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'Ubah Foto\nGoal',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              )
+            : Stack(
+                children: [
+                  Positioned(
+                    bottom: 8,
+                    right: 8,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.green.shade700,
+                            Colors.green.shade500,
+                          ],
+                        ),
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.3),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.edit_rounded,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+class _InputField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+  final bool isDarkMode;
+  final String? prefixText;
+  final TextInputType? keyboardType;
+  final int maxLines;
+  final TextCapitalization textCapitalization;
+  final Function(String)? onChanged;
+  final String? Function(String?)? validator;
+
+  const _InputField({
+    Key? key,
+    required this.label,
+    required this.controller,
+    required this.hint,
+    required this.icon,
+    required this.isDarkMode,
+    this.prefixText,
+    this.keyboardType,
+    this.maxLines = 1,
+    this.textCapitalization = TextCapitalization.none,
+    this.onChanged,
+    this.validator,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixText: prefixText,
+            prefixIcon: Icon(
+              icon,
+              color: Colors.lightGreen.shade700,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: Colors.lightGreen.shade700,
+                width: 2,
+              ),
+            ),
+            filled: true,
+            fillColor: isDarkMode
+                ? Colors.grey.shade800.withOpacity(0.3)
+                : Colors.grey.shade50,
+          ),
+          keyboardType: keyboardType,
+          maxLines: maxLines,
+          textCapitalization: textCapitalization,
+          onChanged: onChanged,
+          validator: validator,
+        ),
+      ],
     );
   }
 }

@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 
 import '../../providers/goal_provider.dart';
-import '../../providers/theme_provider.dart';
 import 'add_goal_screen.dart';
 import 'goal_detail_screen.dart';
 import 'edit_goal_screen.dart';
@@ -28,13 +27,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final goalProvider = Provider.of<GoalProvider>(context);
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    final currency = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -42,32 +35,38 @@ class _GoalListScreenState extends State<GoalListScreen> {
         child: Column(
           children: [
             // Custom Header
-            _buildCustomHeader(context, isDarkMode),
+            const _CustomHeader(),
 
             // Main Content
             Expanded(
-              child: RefreshIndicator(
-                onRefresh: () async {
-                  await goalProvider.fetchGoals();
+              child: Consumer<GoalProvider>(
+                builder: (context, goalProvider, child) {
+                   if (goalProvider.isLoading) {
+                     return const Center(child: CircularProgressIndicator());
+                   }
+                   
+                   if (goalProvider.goals.isEmpty) {
+                     return _EmptyState(isDarkMode: isDarkMode);
+                   }
+
+                   return RefreshIndicator(
+                    onRefresh: () async {
+                      await goalProvider.fetchGoals();
+                    },
+                    child: ListView.builder(
+                      padding: const EdgeInsets.all(20),
+                      itemCount: goalProvider.goals.length,
+                      itemBuilder: (context, index) {
+                        final goal = goalProvider.goals[index];
+                        return GoalCard(
+                          key: ValueKey(goal.id),
+                          goal: goal,
+                          isDarkMode: isDarkMode,
+                        );
+                      },
+                    ),
+                  );
                 },
-                child: goalProvider.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : goalProvider.goals.isEmpty
-                        ? _buildEmptyState(isDarkMode)
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(20),
-                            itemCount: goalProvider.goals.length,
-                            itemBuilder: (context, index) {
-                              final goal = goalProvider.goals[index];
-                              return _buildGoalCard(
-                                context,
-                                goal,
-                                currency,
-                                goalProvider,
-                                isDarkMode,
-                              );
-                            },
-                          ),
               ),
             ),
           ],
@@ -88,8 +87,13 @@ class _GoalListScreenState extends State<GoalListScreen> {
       ),
     );
   }
+}
 
-  Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
+class _CustomHeader extends StatelessWidget {
+  const _CustomHeader({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       color: Theme.of(context).cardTheme.color,
@@ -137,8 +141,15 @@ class _GoalListScreenState extends State<GoalListScreen> {
       ),
     );
   }
+}
 
-  Widget _buildEmptyState(bool isDarkMode) {
+class _EmptyState extends StatelessWidget {
+  final bool isDarkMode;
+
+  const _EmptyState({Key? key, required this.isDarkMode}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -208,31 +219,90 @@ class _GoalListScreenState extends State<GoalListScreen> {
       ),
     );
   }
+}
 
-  Widget _buildGoalCard(
-    BuildContext context,
-    dynamic goal,
-    NumberFormat currency,
-    dynamic goalProvider,
-    bool isDarkMode,
-  ) {
-    final progress = (goal.progress / 100).clamp(0.0, 1.0);
+class GoalCard extends StatefulWidget {
+  final dynamic goal;
+  final bool isDarkMode;
+
+  const GoalCard({
+    Key? key,
+    required this.goal,
+    required this.isDarkMode,
+  }) : super(key: key);
+
+  @override
+  State<GoalCard> createState() => _GoalCardState();
+}
+
+class _GoalCardState extends State<GoalCard> {
+  File? _goalImage;
+  bool _imageExists = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkImage();
+  }
+
+  @override
+  void didUpdateWidget(GoalCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.goal.photoPath != widget.goal.photoPath) {
+      _checkImage();
+    }
+  }
+
+  void _checkImage() {
+    if (widget.goal.photoPath != null) {
+      final file = File(widget.goal.photoPath!);
+      // Checking existence synchronously here is still "okay" if done once per update
+      // but moving to async if file I/O is heavy is better. 
+      // For local files on mobile, sync check is usually fast enough if not done in build loop.
+      // However, to be strictly "optimized/lighter", we can do it:
+      final exists = file.existsSync();
+      setState(() {
+        _imageExists = exists;
+        _goalImage = exists ? file : null;
+      });
+    } else {
+      setState(() {
+        _imageExists = false;
+        _goalImage = null;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final currency = NumberFormat.currency(
+      locale: 'id_ID',
+      symbol: 'Rp ',
+      decimalDigits: 0,
+    );
+    
+    // Calculate progress (clamped)
+    final progress = (widget.goal.progress / 100).clamp(0.0, 1.0);
     final isCompleted = progress >= 1.0;
+    
+    // We access Provider via context.read/select locally inside handlers usually, 
+    // but for the menu actions we need the provider instance.
+    // It's better to pass actions or look up provider in the callback.
 
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: isDarkMode ? Colors.grey.shade800 : Colors.white,
+        color: widget.isDarkMode ? Colors.grey.shade800 : Colors.white,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: isCompleted
               ? Colors.green.shade300
-              : (isDarkMode ? Colors.grey.shade700 : Colors.grey.shade100),
+              : (widget.isDarkMode ? Colors.grey.shade700 : Colors.grey.shade100),
           width: isCompleted ? 2 : 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: isDarkMode
+            color: widget.isDarkMode
                 ? Colors.black.withOpacity(0.3)
                 : Colors.grey.shade200.withOpacity(0.5),
             blurRadius: 15,
@@ -246,7 +316,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
           borderRadius: BorderRadius.circular(20),
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => GoalDetailScreen(goal: goal)),
+              MaterialPageRoute(builder: (_) => GoalDetailScreen(goal: widget.goal)),
             );
           },
           child: Padding(
@@ -278,16 +348,14 @@ class _GoalListScreenState extends State<GoalListScreen> {
                             offset: const Offset(0, 4),
                           ),
                         ],
-                        image: goal.photoPath != null &&
-                                File(goal.photoPath!).existsSync()
+                        image: _imageExists && _goalImage != null
                             ? DecorationImage(
-                                image: FileImage(File(goal.photoPath!)),
+                                image: FileImage(_goalImage!),
                                 fit: BoxFit.cover,
                               )
                             : null,
                       ),
-                      child: goal.photoPath == null ||
-                              !File(goal.photoPath!).existsSync()
+                      child: !_imageExists
                           ? const Icon(
                               Icons.star_rounded,
                               color: Colors.white,
@@ -306,7 +374,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                             children: [
                               Expanded(
                                 child: Text(
-                                  goal.name,
+                                  widget.goal.name,
                                   style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.bold,
@@ -358,10 +426,10 @@ class _GoalListScreenState extends State<GoalListScreen> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            '${goal.progress.toStringAsFixed(1)}% dari target',
+                            '${widget.goal.progress.toStringAsFixed(1)}% dari target',
                             style: TextStyle(
                               fontSize: 13,
-                              color: isDarkMode
+                              color: widget.isDarkMode
                                   ? Colors.grey.shade400
                                   : Colors.grey.shade600,
                               fontWeight: FontWeight.w500,
@@ -375,7 +443,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                     PopupMenuButton(
                       icon: Icon(
                         Icons.more_vert_rounded,
-                        color: isDarkMode
+                        color: widget.isDarkMode
                             ? Colors.grey.shade500
                             : Colors.grey.shade400,
                       ),
@@ -431,19 +499,19 @@ class _GoalListScreenState extends State<GoalListScreen> {
                           Navigator.of(context).push(
                             MaterialPageRoute(
                               builder: (_) => DepositScreen(
-                                goalId: goal.id,
-                                goalName: goal.name,
+                                goalId: widget.goal.id,
+                                goalName: widget.goal.name,
                               ),
                             ),
                           );
                         } else if (value == 'edit') {
                           Navigator.of(context).push(
                             MaterialPageRoute(
-                              builder: (_) => EditGoalScreen(goal: goal),
+                              builder: (_) => EditGoalScreen(goal: widget.goal),
                             ),
                           );
                         } else if (value == 'delete') {
-                          _confirmDelete(context, goal, goalProvider);
+                           _confirmDelete(context, widget.goal);
                         }
                       },
                     ),
@@ -456,12 +524,12 @@ class _GoalListScreenState extends State<GoalListScreen> {
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
-                    color: isDarkMode
+                    color: widget.isDarkMode
                         ? Colors.grey.shade900.withOpacity(0.5)
                         : Colors.green.shade50.withOpacity(0.5),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isDarkMode
+                      color: widget.isDarkMode
                           ? Colors.grey.shade700
                           : Colors.green.shade100,
                     ),
@@ -478,7 +546,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                               'Terkumpul',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDarkMode
+                                color: widget.isDarkMode
                                     ? Colors.grey.shade400
                                     : Colors.grey.shade600,
                                 fontWeight: FontWeight.w500,
@@ -486,7 +554,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              currency.format(goal.currentAmount),
+                              currency.format(widget.goal.currentAmount),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -501,7 +569,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                       Container(
                         height: 40,
                         width: 1,
-                        color: isDarkMode
+                        color: widget.isDarkMode
                             ? Colors.grey.shade700
                             : Colors.grey.shade300,
                       ),
@@ -515,7 +583,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                               'Target',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: isDarkMode
+                                color: widget.isDarkMode
                                     ? Colors.grey.shade400
                                     : Colors.grey.shade600,
                                 fontWeight: FontWeight.w500,
@@ -523,7 +591,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              currency.format(goal.targetAmount),
+                              currency.format(widget.goal.targetAmount),
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -554,13 +622,13 @@ class _GoalListScreenState extends State<GoalListScreen> {
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
-                            color: isDarkMode
+                            color: widget.isDarkMode
                                 ? Colors.grey.shade400
                                 : Colors.grey.shade600,
                           ),
                         ),
                         Text(
-                          '${goal.progress.toStringAsFixed(1)}%',
+                          '${widget.goal.progress.toStringAsFixed(1)}%',
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
@@ -573,7 +641,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
                     Container(
                       height: 10,
                       decoration: BoxDecoration(
-                        color: isDarkMode
+                        color: widget.isDarkMode
                             ? Colors.grey.shade800
                             : Colors.grey.shade200,
                         borderRadius: BorderRadius.circular(10),
@@ -619,8 +687,7 @@ class _GoalListScreenState extends State<GoalListScreen> {
     );
   }
 
-  void _confirmDelete(
-      BuildContext context, dynamic goal, dynamic goalProvider) {
+  void _confirmDelete(BuildContext context, dynamic goal) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -638,7 +705,8 @@ class _GoalListScreenState extends State<GoalListScreen> {
           ),
           TextButton(
             onPressed: () {
-              goalProvider.deleteGoal(goal.id);
+              // Get provider before popping if needed, or maintain context
+              Provider.of<GoalProvider>(context, listen: false).deleteGoal(goal.id);
               Navigator.pop(ctx);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(

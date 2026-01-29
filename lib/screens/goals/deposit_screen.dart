@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../../providers/goal_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/validators.dart';
 import '../../widgets/overflow_allocation_dialog.dart';
 
@@ -30,6 +31,11 @@ class _DepositScreenState extends State<DepositScreen> {
       'name': 'Manual Cash',
       'icon': Icons.money_rounded,
       'color': Colors.green,
+    },
+    'balance': {
+      'name': 'Saldo Akun',
+      'icon': Icons.account_balance_wallet_rounded,
+      'color': Colors.orange,
     },
     'dana': {
       'name': 'DANA',
@@ -104,6 +110,7 @@ class _DepositScreenState extends State<DepositScreen> {
           context: context,
           overflowAmount: result['overflow_amount'].toDouble(),
           completedGoalName: widget.goalName,
+          sourceMethod: _selectedMethod,
         );
       } else {
         // Normal deposit without overflow
@@ -145,7 +152,7 @@ class _DepositScreenState extends State<DepositScreen> {
         child: Column(
           children: [
             // Custom Header
-            _buildCustomHeader(context, isDarkMode),
+            const _CustomHeader(),
 
             // Main Content
             Expanded(
@@ -240,68 +247,120 @@ class _DepositScreenState extends State<DepositScreen> {
                         ),
                       ),
                       const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: _selectedMethod,
-                        decoration: InputDecoration(
-                          hintText: 'Pilih sumber dana',
-                          prefixIcon: Icon(
-                            _paymentMethods[_selectedMethod]!['icon'],
-                            color: Colors.lightGreen.shade700,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.lightGreen.shade700,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                              ? Colors.grey.shade800.withOpacity(0.3)
-                              : Colors.grey.shade50,
-                        ),
-                        items: _paymentMethods.entries.map((entry) {
-                          return DropdownMenuItem<String>(
-                            value: entry.key,
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: (entry.value['color'] as Color)
-                                        .withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    entry.value['icon'],
-                                    color: entry.value['color'],
-                                    size: 20,
-                                  ),
+                      Builder(
+                        builder: (context) {
+                          // Get goal to determine type
+                          final goal = Provider.of<GoalProvider>(context)
+                              .goals
+                              .firstWhere((g) => g.id == widget.goalId);
+                          print('DEBUG: DepositScreen Goal: ${goal.name}, Type: ${goal.type}, ID: ${goal.id}');
+                          final isCashGoal = goal.type == 'cash';
+                          
+                          // Filter methods
+                          final allowedMethods = _paymentMethods.entries.where((entry) {
+                            if (isCashGoal) {
+                              return entry.key == 'manual';
+                            } else {
+                              // Digital goal: allow everything EXCEPT manual
+                              return entry.key != 'manual';
+                            }
+                          }).where((entry) {
+                            // Balance check (for digital)
+                            if (entry.key == 'balance') {
+                              final user = Provider.of<AuthProvider>(context).user;
+                              return user != null && user.availableBalance > 0;
+                            }
+                            return true;
+                          }).toList();
+                          
+                          // Ensure selected method is valid
+                          // We can't update state here, so we select a display value
+                          String displaySelected = _selectedMethod;
+                          bool isValid = allowedMethods.any((e) => e.key == _selectedMethod);
+                          
+                          if (!isValid && allowedMethods.isNotEmpty) {
+                            displaySelected = allowedMethods.first.key;
+                            // Schedule state update to sync variable (optional but good for consistency)
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              if (_selectedMethod != displaySelected) {
+                                setState(() => _selectedMethod = displaySelected);
+                              }
+                            });
+                          }
+
+                          return DropdownButtonFormField<String>(
+                            isExpanded: true,
+                            value: displaySelected,
+                            decoration: InputDecoration(
+                              hintText: 'Pilih sumber dana',
+                              prefixIcon: Icon(
+                                _paymentMethods[displaySelected]?['icon'] ?? Icons.payment,
+                                color: Colors.lightGreen.shade700,
+                              ),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDarkMode
+                                      ? Colors.grey.shade700
+                                      : Colors.grey.shade300,
                                 ),
-                                const SizedBox(width: 12),
-                                Text(entry.value['name']),
-                              ],
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: isDarkMode
+                                      ? Colors.grey.shade700
+                                      : Colors.grey.shade300,
+                                ),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                                borderSide: BorderSide(
+                                  color: Colors.lightGreen.shade700,
+                                  width: 2,
+                                ),
+                              ),
+                              filled: true,
+                              fillColor: isDarkMode
+                                  ? Colors.grey.shade800.withOpacity(0.3)
+                                  : Colors.grey.shade50,
                             ),
+                            items: allowedMethods.map((entry) {
+                               String name = entry.value['name'];
+                               if (entry.key == 'balance') {
+                                 final user = Provider.of<AuthProvider>(context).user;
+                                 if (user != null) {
+                                   name += ' (${_currencyFormat.format(user.availableBalance)})';
+                                 }
+                               }
+                              
+                              return DropdownMenuItem<String>(
+                                value: entry.key,
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: (entry.value['color'] as Color)
+                                            .withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Icon(
+                                        entry.value['icon'],
+                                        color: entry.value['color'],
+                                        size: 20,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(child: Text(name, overflow: TextOverflow.ellipsis)),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (val) =>
+                                setState(() => _selectedMethod = val!),
                           );
-                        }).toList(),
-                        onChanged: (val) =>
-                            setState(() => _selectedMethod = val!),
+                        }
                       ),
                       const SizedBox(height: 20),
 
@@ -429,8 +488,13 @@ class _DepositScreenState extends State<DepositScreen> {
       ),
     );
   }
+}
 
-  Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
+class _CustomHeader extends StatelessWidget {
+  const _CustomHeader({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       color: Theme.of(context).cardTheme.color,

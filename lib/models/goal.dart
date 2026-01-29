@@ -7,6 +7,7 @@ class Goal {
   final String? description;
   final dynamic progressPercentage; // Can be int or double from JSON
   final String? photoPath;
+  final String? type; // 'digital' or 'cash'
 
   Goal({
     required this.id,
@@ -17,6 +18,7 @@ class Goal {
     this.description,
     this.progressPercentage,
     this.photoPath,
+    this.type,
   });
 
   factory Goal.fromJson(Map<String, dynamic> json) {
@@ -27,6 +29,7 @@ class Goal {
       currentAmount: (json['current_amount'] as num).toDouble(),
       deadline: json['deadline'],
       description: json['description'],
+      type: json['type'],
       progressPercentage: json['progress_percentage'],
       photoPath: null, // Photo path will be loaded separately
     );
