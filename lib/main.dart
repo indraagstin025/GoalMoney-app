@@ -46,16 +46,8 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          home: Consumer<AuthProvider>(
-            builder: (context, auth, _) {
-              if (auth.status == AuthStatus.loading) {
-                return const SplashScreen();
-              }
-              return auth.isAuthenticated
-                  ? const DashboardScreen()
-                  : const LoginScreen();
-            },
-          ),
+          // Start with Splash Screen which handles the routing logic
+          home: const SplashScreen(),
         );
       },
     );

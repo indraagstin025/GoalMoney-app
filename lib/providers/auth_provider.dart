@@ -18,15 +18,12 @@ class AuthProvider with ChangeNotifier {
   bool get isAuthenticated => _status == AuthStatus.authenticated;
 
   AuthProvider() {
-    _loadUser();
+    checkLoginStatus();
   }
 
-  Future<void> _loadUser() async {
+  Future<void> checkLoginStatus() async {
     final prefs = await SharedPreferences.getInstance();
     _token = prefs.getString('token');
-
-    // Artificial delay for splash screen visibility (3 seconds)
-    await Future.delayed(const Duration(seconds: 3));
 
     if (_token != null) {
       try {

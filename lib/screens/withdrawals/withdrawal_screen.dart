@@ -147,25 +147,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
 
       if (!mounted) return;
 
-      // --- NEW: Trigger Badge Check ---
-      try {
-        final badgeProvider = Provider.of<BadgeProvider>(
-          context,
-          listen: false,
-        );
-        final newBadges = await badgeProvider.checkAndAwardBadges();
-
-        if (newBadges.isNotEmpty && mounted) {
-          await showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => BadgeCelebrationDialog(newBadges: newBadges),
-          );
-        }
-      } catch (e) {
-        debugPrint('[WithdrawalScreen] Badge check error: $e');
-      }
-      // -------------------------------
+      // Badge check moved to after processing logic
 
       if (!mounted) return;
 
@@ -183,6 +165,35 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
         context,
         listen: false,
       ).fetchDashboardSummary();
+
+      // Fetch Notifications so the new one appears immediately
+      await Provider.of<GoalProvider>(
+        context,
+        listen: false,
+      ).fetchNotifications();
+
+      if (!mounted) return;
+
+      // --- MOVED: Trigger Badge Check (After success) ---
+      try {
+        final badgeProvider = Provider.of<BadgeProvider>(
+          context,
+          listen: false,
+        );
+        // Check badges NOW that withdrawal is approved
+        final newBadges = await badgeProvider.checkAndAwardBadges();
+
+        if (newBadges.isNotEmpty && mounted) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => BadgeCelebrationDialog(newBadges: newBadges),
+          );
+        }
+      } catch (e) {
+        debugPrint('[WithdrawalScreen] Badge check error: $e');
+      }
+      // -------------------------------
 
       if (!mounted) return;
 
@@ -258,7 +269,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
   }
 
   Future<void> _showProcessingDialog() async {
-    int secondsRemaining = 30;
+    int secondsRemaining = 5;
 
     await showDialog(
       context: context,
@@ -306,21 +317,10 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  'Harap tunggu $secondsRemaining detik',
+                  'Mohon tunggu sebentar...',
                   style: TextStyle(color: Colors.grey[600]),
-                ),
-                const SizedBox(height: 16),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: (30 - secondsRemaining) / 30,
-                    backgroundColor: Colors.grey[300],
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      Colors.green.shade600,
-                    ),
-                    minHeight: 8,
-                  ),
                 ),
               ],
             ),
@@ -560,14 +560,21 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                       ),
                     ),
                     // Goal Options
-                    ...goals.map((goal) {
-                      return DropdownMenuItem<int?>(
-                        value: goal.id,
-                        child: Text(
-                          '${goal.name} (${_currencyFormat.format(goal.currentAmount)})',
-                        ),
-                      );
-                    }).toList(),
+                    ...goals
+                        .fold<Map<int, dynamic>>({}, (map, goal) {
+                          map[goal.id] = goal;
+                          return map;
+                        })
+                        .values
+                        .map((goal) {
+                          return DropdownMenuItem<int?>(
+                            value: goal.id,
+                            child: Text(
+                              '${goal.name} (${_currencyFormat.format(goal.currentAmount)})',
+                            ),
+                          );
+                        })
+                        .toList(),
                   ],
                   onChanged: (val) {
                     setState(() {
