@@ -4,7 +4,11 @@ import 'package:intl/intl.dart';
 import '../../providers/goal_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/validators.dart';
-import '../../models/goal.dart';
+import '../../providers/badge_provider.dart';
+import '../../widgets/badge_celebration_dialog.dart';
+import '../../widgets/currency_input_field.dart';
+import '../../widgets/withdrawal_header.dart';
+import '../../widgets/withdrawal_history_list.dart';
 
 class WithdrawalScreen extends StatefulWidget {
   final double? prefilledAmount;
@@ -35,6 +39,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     'ovo': Icons.wallet,
     'shopeepay': Icons.shopping_bag,
     'manual': Icons.money_rounded,
+    'pospay': Icons.local_post_office_rounded,
   };
 
   bool _isLoading = false;
@@ -87,7 +92,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
           if (provider.goals.isNotEmpty) {
             _selectedGoalId = provider.goals.first.id;
             _selectedGoalBalance = provider.goals.first.currentAmount;
-            
+
             // Set method based on goal type
             if (provider.goals.first.type == 'cash') {
               _selectedMethod = 'manual';
@@ -109,21 +114,22 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     // Actually _selectedGoalId being null is now valid for Balance.
     // However, we rely on the dropdown to set it.
     // If it's valid to be null, we remove this check OR adjust it.
-    
+
     // BUT wait, init/fetch sets it to first goal.
     // So distinct null vs "not set" is tricky if "not set" is null.
     // But in our dropdown we explicitly set value: null.
-    
+
     // Let's assume if it is null, it means Available Balance because we default select first goal if available.
     // If no goals available, it stays null?
-    
+
     // Ideally we should have a flag or just trust the selection.
-    
+
     setState(() => _isLoading = true);
 
     try {
-      final amount =
-          double.parse(_amountCtrl.text.replaceAll('.', '').replaceAll(',', ''));
+      final amount = double.parse(
+        _amountCtrl.text.replaceAll('.', '').replaceAll(',', ''),
+      );
 
       // Validasi saldo goal yang dipilih
       if (amount > _selectedGoalBalance) {
@@ -141,16 +147,42 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
 
       if (!mounted) return;
 
+      // --- NEW: Trigger Badge Check ---
+      try {
+        final badgeProvider = Provider.of<BadgeProvider>(
+          context,
+          listen: false,
+        );
+        final newBadges = await badgeProvider.checkAndAwardBadges();
+
+        if (newBadges.isNotEmpty && mounted) {
+          await showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => BadgeCelebrationDialog(newBadges: newBadges),
+          );
+        }
+      } catch (e) {
+        debugPrint('[WithdrawalScreen] Badge check error: $e');
+      }
+      // -------------------------------
+
+      if (!mounted) return;
+
       // Show processing dialog with countdown
       await _showProcessingDialog();
 
       if (!mounted) return;
 
       // After waiting, refresh history to trigger auto-approval check
-      await Provider.of<GoalProvider>(context, listen: false)
-          .fetchWithdrawalHistory();
-      await Provider.of<GoalProvider>(context, listen: false)
-          .fetchDashboardSummary();
+      await Provider.of<GoalProvider>(
+        context,
+        listen: false,
+      ).fetchWithdrawalHistory();
+      await Provider.of<GoalProvider>(
+        context,
+        listen: false,
+      ).fetchDashboardSummary();
 
       if (!mounted) return;
 
@@ -170,7 +202,11 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
               ),
               shape: BoxShape.circle,
             ),
-            child: const Icon(Icons.check_circle, color: Colors.white, size: 40),
+            child: const Icon(
+              Icons.check_circle,
+              color: Colors.white,
+              size: 40,
+            ),
           ),
           title: const Text(
             'Penarikan Berhasil!',
@@ -280,7 +316,9 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                   child: LinearProgressIndicator(
                     value: (30 - secondsRemaining) / 30,
                     backgroundColor: Colors.grey[300],
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.green.shade600),
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.green.shade600,
+                    ),
                     minHeight: 8,
                   ),
                 ),
@@ -302,7 +340,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
         child: Column(
           children: [
             // Custom Header
-            _buildCustomHeader(context, isDarkMode),
+            WithdrawalHeader(isDarkMode: isDarkMode),
 
             // Overflow Title Override (if from overflow)
             if (widget.fromOverflow)
@@ -359,54 +397,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     );
   }
 
-  Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      color: Theme.of(context).cardTheme.color,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // GoalMoney Logo
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [Colors.green.shade700, Colors.green.shade500],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.savings_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Text(
-                'GoalMoney',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.lightGreen,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
-
-          // Back Button
-          IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
-            onPressed: () => Navigator.pop(context),
-          ),
-        ],
-      ),
-    );
-  }
+  // Header widget now extracted to WithdrawalHeader widget file
 
   Widget _buildRequestTab(bool isDarkMode) {
     return SingleChildScrollView(
@@ -515,11 +506,16 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
             Consumer2<GoalProvider, AuthProvider>(
               builder: (context, goalProvider, authProvider, _) {
                 final goals = goalProvider.goals;
-                final availableBalance = authProvider.user?.availableBalance ?? 0;
-                
+                final availableBalance =
+                    authProvider.user?.availableBalance ?? 0;
+
                 return DropdownButtonFormField<int?>(
                   isExpanded: true,
-                  value: _selectedGoalId,
+                  value:
+                      (goals.any((g) => g.id == _selectedGoalId) ||
+                          _selectedGoalId == null)
+                      ? _selectedGoalId
+                      : null,
                   decoration: InputDecoration(
                     hintText: 'Pilih sumber dana',
                     prefixIcon: Icon(
@@ -577,16 +573,22 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                     setState(() {
                       _selectedGoalId = val;
                       if (val == null) {
-                         _selectedGoalBalance = availableBalance;
-                         if (_selectedMethod == 'manual') _selectedMethod = 'dana';
+                        _selectedGoalBalance = availableBalance;
+                        if (_selectedMethod == 'manual')
+                          _selectedMethod = 'dana';
                       } else {
-                         final selectedGoal = goals.firstWhere((g) => g.id == val);
-                         _selectedGoalBalance = selectedGoal.currentAmount;
-                         if (selectedGoal.type == 'cash') {
+                        final selectedIndex = goals.indexWhere(
+                          (g) => g.id == val,
+                        );
+                        if (selectedIndex != -1) {
+                          final selectedGoal = goals[selectedIndex];
+                          _selectedGoalBalance = selectedGoal.currentAmount;
+                          if (selectedGoal.type == 'cash') {
                             _selectedMethod = 'manual';
-                         } else if (_selectedMethod == 'manual') {
+                          } else if (_selectedMethod == 'manual') {
                             _selectedMethod = 'dana';
-                         }
+                          }
+                        }
                       }
                     });
                   },
@@ -594,7 +596,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
               },
             ),
             const SizedBox(height: 12),
- 
+
             // Selected Goal Balance Info
             Container(
               padding: const EdgeInsets.all(12),
@@ -603,9 +605,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                     ? Colors.green.shade900.withOpacity(0.3)
                     : Colors.green.shade50,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.green.shade300,
-                ),
+                border: Border.all(color: Colors.green.shade300),
               ),
               child: Row(
                 children: [
@@ -640,74 +640,76 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
               ),
             ),
             const SizedBox(height: 8),
-              // Method Dropdown filtered by Goal Type
-              Builder(
-                builder: (context) {
-                   // Calculate allowed methods
-                   final allowedMethods = _methodIcons.keys.where((m) {
-                      if (_selectedGoalId == null) return m != 'manual';
-                      try {
-                         final goal = Provider.of<GoalProvider>(context, listen: false)
-                             .goals.firstWhere((g) => g.id == _selectedGoalId);
-                         if (goal.type == 'cash') return m == 'manual';
-                         return m != 'manual';
-                      } catch (e) {
-                         return true; 
-                      }
-                   }).toList();
+            // Method Dropdown filtered by Goal Type
+            Builder(
+              builder: (context) {
+                // Calculate allowed methods
+                final allowedMethods = _methodIcons.keys.where((m) {
+                  if (_selectedGoalId == null) return m != 'manual';
+                  try {
+                    final goal = Provider.of<GoalProvider>(
+                      context,
+                      listen: false,
+                    ).goals.firstWhere((g) => g.id == _selectedGoalId);
+                    if (goal.type == 'cash') return m == 'manual';
+                    return m != 'manual';
+                  } catch (e) {
+                    return true;
+                  }
+                }).toList();
 
-                   return DropdownButtonFormField<String>(
-                    value: _selectedMethod,
-                    decoration: InputDecoration(
-                      hintText: 'Pilih metode penarikan',
-                      prefixIcon: Icon(
-                        _methodIcons[_selectedMethod] ?? Icons.payment,
-                        color: Colors.lightGreen.shade700,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDarkMode
-                              ? Colors.grey.shade700
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: isDarkMode
-                              ? Colors.grey.shade700
-                              : Colors.grey.shade300,
-                        ),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(
-                          color: Colors.lightGreen.shade700,
-                          width: 2,
-                        ),
-                      ),
-                      filled: true,
-                      fillColor: isDarkMode
-                          ? Colors.grey.shade800.withOpacity(0.3)
-                          : Colors.grey.shade50,
+                return DropdownButtonFormField<String>(
+                  value: _selectedMethod,
+                  decoration: InputDecoration(
+                    hintText: 'Pilih metode penarikan',
+                    prefixIcon: Icon(
+                      _methodIcons[_selectedMethod] ?? Icons.payment,
+                      color: Colors.lightGreen.shade700,
                     ),
-                    items: allowedMethods.map((m) {
-                      return DropdownMenuItem(
-                        value: m,
-                        child: Row(
-                          children: [
-                            Icon(_methodIcons[m], size: 20),
-                            const SizedBox(width: 12),
-                            Text(m.toUpperCase().replaceAll('_', ' ')),
-                          ],
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) => setState(() => _selectedMethod = val!),
-                  );
-                }
-              ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDarkMode
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: isDarkMode
+                            ? Colors.grey.shade700
+                            : Colors.grey.shade300,
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: Colors.lightGreen.shade700,
+                        width: 2,
+                      ),
+                    ),
+                    filled: true,
+                    fillColor: isDarkMode
+                        ? Colors.grey.shade800.withOpacity(0.3)
+                        : Colors.grey.shade50,
+                  ),
+                  items: allowedMethods.map((m) {
+                    return DropdownMenuItem(
+                      value: m,
+                      child: Row(
+                        children: [
+                          Icon(_methodIcons[m], size: 20),
+                          const SizedBox(width: 12),
+                          Text(m.toUpperCase().replaceAll('_', ' ')),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => _selectedMethod = val!),
+                );
+              },
+            ),
             const SizedBox(height: 20),
 
             // Account Number
@@ -757,59 +759,17 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                     : Colors.grey.shade50,
               ),
               keyboardType: TextInputType.number,
-              validator: (val) => val == null || val.isEmpty ? 'Wajib diisi' : null,
+              validator: (val) =>
+                  val == null || val.isEmpty ? 'Wajib diisi' : null,
             ),
             const SizedBox(height: 20),
 
             // Amount
-            Text(
-              'Jumlah Penarikan',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).textTheme.bodyLarge?.color,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextFormField(
+            CurrencyInputField(
+              label: 'Jumlah Penarikan',
               controller: _amountCtrl,
+              isDarkMode: isDarkMode,
               enabled: !widget.fromOverflow, // Disable if from overflow
-              decoration: InputDecoration(
-                hintText: '0',
-                prefixText: 'Rp ',
-                prefixIcon: Icon(
-                  Icons.payments_rounded,
-                  color: Colors.lightGreen.shade700,
-                ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDarkMode
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: isDarkMode
-                        ? Colors.grey.shade700
-                        : Colors.grey.shade300,
-                  ),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: BorderSide(
-                    color: Colors.lightGreen.shade700,
-                    width: 2,
-                  ),
-                ),
-                filled: true,
-                fillColor: isDarkMode
-                    ? Colors.grey.shade800.withOpacity(0.3)
-                    : Colors.grey.shade50,
-              ),
-              keyboardType: TextInputType.number,
               validator: Validators.validateAmount,
             ),
             const SizedBox(height: 20),
@@ -931,192 +891,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     );
   }
 
+  // History widget now extracted to WithdrawalHistoryList widget file
   Widget _buildHistoryTab(bool isDarkMode) {
-    return FutureBuilder(
-      future: Provider.of<GoalProvider>(context, listen: false)
-          .fetchWithdrawalHistory(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        return Consumer<GoalProvider>(
-          builder: (context, provider, child) {
-            final withdrawals = provider.withdrawals;
-
-            if (withdrawals.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(24),
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.grey.shade100.withOpacity(0.3),
-                            Colors.grey.shade50.withOpacity(0.3),
-                          ],
-                        ),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.history_rounded,
-                        size: 64,
-                        color: Colors.grey.shade400,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Belum ada riwayat penarikan',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: isDarkMode
-                            ? Colors.grey.shade400
-                            : Colors.grey.shade600,
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }
-
-            return ListView.separated(
-              padding: const EdgeInsets.all(20),
-              itemCount: withdrawals.length,
-              separatorBuilder: (context, index) => const SizedBox(height: 12),
-              itemBuilder: (context, index) {
-                final item = withdrawals[index];
-                Color statusColor;
-                IconData statusIcon;
-                switch (item.status) {
-                  case 'approved':
-                    statusColor = Colors.green;
-                    statusIcon = Icons.check_circle;
-                    break;
-                  case 'rejected':
-                    statusColor = Colors.red;
-                    statusIcon = Icons.cancel;
-                    break;
-                  default:
-                    statusColor = Colors.orange;
-                    statusIcon = Icons.access_time;
-                }
-
-                return Container(
-                  decoration: BoxDecoration(
-                    color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: isDarkMode
-                          ? Colors.grey.shade700
-                          : Colors.grey.shade200,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: isDarkMode
-                            ? Colors.black.withOpacity(0.2)
-                            : Colors.grey.shade200.withOpacity(0.5),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Row(
-                      children: [
-                        // Icon
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            statusIcon,
-                            color: statusColor,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-
-                        // Info
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                _currencyFormat.format(item.amount),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 18,
-                                  color: Theme.of(context)
-                                      .textTheme
-                                      .titleLarge
-                                      ?.color,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item.method
-                                    .toUpperCase()
-                                    .replaceAll('_', ' '),
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isDarkMode
-                                      ? Colors.grey.shade400
-                                      : Colors.grey.shade600,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                item.createdAt,
-                                style: TextStyle(
-                                  color: isDarkMode
-                                      ? Colors.grey.shade500
-                                      : Colors.grey.shade500,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // Status Badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                statusColor,
-                                statusColor.withOpacity(0.7),
-                              ],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            item.status.toUpperCase(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        );
-      },
-    );
+    return WithdrawalHistoryList(isDarkMode: isDarkMode);
   }
 }
+
+// CurrencyInputField widget extracted to: lib/widgets/currency_input_field.dart
+// WithdrawalHeader widget extracted to: lib/widgets/withdrawal_header.dart
+// WithdrawalHistoryList widget extracted to: lib/widgets/withdrawal_history_list.dart

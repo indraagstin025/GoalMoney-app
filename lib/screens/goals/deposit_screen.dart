@@ -4,17 +4,16 @@ import 'package:intl/intl.dart';
 import '../../providers/goal_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/validators.dart';
+import '../../providers/badge_provider.dart';
+import '../../widgets/badge_celebration_dialog.dart';
 import '../../widgets/overflow_allocation_dialog.dart';
 
 class DepositScreen extends StatefulWidget {
   final int goalId;
   final String goalName;
 
-  const DepositScreen({
-    Key? key,
-    required this.goalId,
-    required this.goalName,
-  }) : super(key: key);
+  const DepositScreen({Key? key, required this.goalId, required this.goalName})
+    : super(key: key);
 
   @override
   State<DepositScreen> createState() => _DepositScreenState();
@@ -42,20 +41,17 @@ class _DepositScreenState extends State<DepositScreen> {
       'icon': Icons.account_balance_wallet,
       'color': Colors.blue,
     },
-    'gopay': {
-      'name': 'GoPay',
-      'icon': Icons.payment,
-      'color': Colors.green,
-    },
-    'ovo': {
-      'name': 'OVO',
-      'icon': Icons.wallet,
-      'color': Colors.purple,
-    },
+    'gopay': {'name': 'GoPay', 'icon': Icons.payment, 'color': Colors.green},
+    'ovo': {'name': 'OVO', 'icon': Icons.wallet, 'color': Colors.purple},
     'shopeepay': {
       'name': 'ShopeePay',
       'icon': Icons.shopping_bag,
       'color': Colors.orange,
+    },
+    'pospay': {
+      'name': 'POSPAY',
+      'icon': Icons.local_post_office_rounded,
+      'color': Colors.deepOrange,
     },
     'bank_transfer': {
       'name': 'Bank Transfer',
@@ -84,19 +80,32 @@ class _DepositScreenState extends State<DepositScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // REDUNDANT CHECK: Ensure goal is not already completed
+      final goal = Provider.of<GoalProvider>(
+        context,
+        listen: false,
+      ).goals.firstWhere((g) => g.id == widget.goalId);
+
+      if (goal.isCompleted) {
+        throw Exception(
+          'Goal ini sudah selesai dan tidak dapat menerima tabungan lagi.',
+        );
+      }
+
       final amount = double.parse(
         _amountCtrl.text.replaceAll('.', '').replaceAll(',', ''),
       );
 
       // UPDATED: Now receives overflow info
-      final result = await Provider.of<GoalProvider>(context, listen: false).addTransaction(
-        goalId: widget.goalId,
-        amount: amount,
-        method: _selectedMethod,
-        description: _descCtrl.text.isNotEmpty
-            ? _descCtrl.text
-            : 'Deposit via ${_paymentMethods[_selectedMethod]!['name']}',
-      );
+      final result = await Provider.of<GoalProvider>(context, listen: false)
+          .addTransaction(
+            goalId: widget.goalId,
+            amount: amount,
+            method: _selectedMethod,
+            description: _descCtrl.text.isNotEmpty
+                ? _descCtrl.text
+                : 'Deposit via ${_paymentMethods[_selectedMethod]!['name']}',
+          );
 
       if (!mounted) return;
 
@@ -125,7 +134,34 @@ class _DepositScreenState extends State<DepositScreen> {
             behavior: SnackBarBehavior.floating,
           ),
         );
-        Navigator.pop(context, true);
+
+        // --- NEW: Trigger Badge Check ---
+        try {
+          final badgeProvider = Provider.of<BadgeProvider>(
+            context,
+            listen: false,
+          );
+          final newBadges = await badgeProvider.checkAndAwardBadges();
+
+          if (newBadges.isNotEmpty && mounted) {
+            // Show celebration and wait for it to be dismissed if needed,
+            // or show it and then pop. Best to show it on parent context if popping.
+            // But for now, let's show it then pop when they close it.
+            if (mounted) {
+              await showDialog(
+                context: context,
+                barrierDismissible: false,
+                builder: (context) =>
+                    BadgeCelebrationDialog(newBadges: newBadges),
+              );
+            }
+          }
+        } catch (badgeError) {
+          print('[DepositScreen] Error triggering badge check: $badgeError');
+        }
+        // -------------------------------
+
+        if (mounted) Navigator.pop(context, true);
       }
     } catch (e) {
       if (mounted) {
@@ -186,53 +222,10 @@ class _DepositScreenState extends State<DepositScreen> {
                       const SizedBox(height: 32),
 
                       // Amount Field
-                      Text(
-                        'Nominal Tabungan',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
+                      CurrencyInputField(
+                        label: 'Nominal Tabungan',
                         controller: _amountCtrl,
-                        decoration: InputDecoration(
-                          hintText: '0',
-                          prefixText: 'Rp ',
-                          prefixIcon: Icon(
-                            Icons.payments_rounded,
-                            color: Colors.lightGreen.shade700,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.lightGreen.shade700,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                              ? Colors.grey.shade800.withOpacity(0.3)
-                              : Colors.grey.shade50,
-                        ),
-                        keyboardType: TextInputType.number,
+                        isDarkMode: isDarkMode,
                         validator: Validators.validateAmount,
                       ),
                       const SizedBox(height: 20),
@@ -249,41 +242,75 @@ class _DepositScreenState extends State<DepositScreen> {
                       const SizedBox(height: 8),
                       Builder(
                         builder: (context) {
-                          // Get goal to determine type
-                          final goal = Provider.of<GoalProvider>(context)
-                              .goals
-                              .firstWhere((g) => g.id == widget.goalId);
-                          print('DEBUG: DepositScreen Goal: ${goal.name}, Type: ${goal.type}, ID: ${goal.id}');
+                          final goals = Provider.of<GoalProvider>(
+                            context,
+                          ).goals;
+
+                          // Safety check: if goals are being refreshed or empty
+                          if (goals.isEmpty) {
+                            return const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(20),
+                                child: CircularProgressIndicator(),
+                              ),
+                            );
+                          }
+
+                          // Find goal safely
+                          final goalIndex = goals.indexWhere(
+                            (g) => g.id == widget.goalId,
+                          );
+                          if (goalIndex == -1) {
+                            // If goal not found in the new list (e.g. deleted or session changed)
+                            return const Center(
+                              child: Text('Goal tidak ditemukan'),
+                            );
+                          }
+
+                          final goal = goals[goalIndex];
+                          print(
+                            'DEBUG: DepositScreen Goal: ${goal.name}, Type: ${goal.type}, ID: ${goal.id}',
+                          );
                           final isCashGoal = goal.type == 'cash';
-                          
+
                           // Filter methods
-                          final allowedMethods = _paymentMethods.entries.where((entry) {
-                            if (isCashGoal) {
-                              return entry.key == 'manual';
-                            } else {
-                              // Digital goal: allow everything EXCEPT manual
-                              return entry.key != 'manual';
-                            }
-                          }).where((entry) {
-                            // Balance check (for digital)
-                            if (entry.key == 'balance') {
-                              final user = Provider.of<AuthProvider>(context).user;
-                              return user != null && user.availableBalance > 0;
-                            }
-                            return true;
-                          }).toList();
-                          
+                          final allowedMethods = _paymentMethods.entries
+                              .where((entry) {
+                                if (isCashGoal) {
+                                  return entry.key == 'manual';
+                                } else {
+                                  // Digital goal: allow everything EXCEPT manual
+                                  return entry.key != 'manual';
+                                }
+                              })
+                              .where((entry) {
+                                // Balance check (for digital)
+                                if (entry.key == 'balance') {
+                                  final user = Provider.of<AuthProvider>(
+                                    context,
+                                  ).user;
+                                  return user != null &&
+                                      user.availableBalance > 0;
+                                }
+                                return true;
+                              })
+                              .toList();
+
                           // Ensure selected method is valid
                           // We can't update state here, so we select a display value
                           String displaySelected = _selectedMethod;
-                          bool isValid = allowedMethods.any((e) => e.key == _selectedMethod);
-                          
+                          bool isValid = allowedMethods.any(
+                            (e) => e.key == _selectedMethod,
+                          );
+
                           if (!isValid && allowedMethods.isNotEmpty) {
                             displaySelected = allowedMethods.first.key;
                             // Schedule state update to sync variable (optional but good for consistency)
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               if (_selectedMethod != displaySelected) {
-                                setState(() => _selectedMethod = displaySelected);
+                                setState(
+                                  () => _selectedMethod = displaySelected,
+                                );
                               }
                             });
                           }
@@ -294,7 +321,8 @@ class _DepositScreenState extends State<DepositScreen> {
                             decoration: InputDecoration(
                               hintText: 'Pilih sumber dana',
                               prefixIcon: Icon(
-                                _paymentMethods[displaySelected]?['icon'] ?? Icons.payment,
+                                _paymentMethods[displaySelected]?['icon'] ??
+                                    Icons.payment,
                                 color: Colors.lightGreen.shade700,
                               ),
                               border: OutlineInputBorder(
@@ -326,14 +354,17 @@ class _DepositScreenState extends State<DepositScreen> {
                                   : Colors.grey.shade50,
                             ),
                             items: allowedMethods.map((entry) {
-                               String name = entry.value['name'];
-                               if (entry.key == 'balance') {
-                                 final user = Provider.of<AuthProvider>(context).user;
-                                 if (user != null) {
-                                   name += ' (${_currencyFormat.format(user.availableBalance)})';
-                                 }
-                               }
-                              
+                              String name = entry.value['name'];
+                              if (entry.key == 'balance') {
+                                final user = Provider.of<AuthProvider>(
+                                  context,
+                                ).user;
+                                if (user != null) {
+                                  name +=
+                                      ' (${_currencyFormat.format(user.availableBalance)})';
+                                }
+                              }
+
                               return DropdownMenuItem<String>(
                                 value: entry.key,
                                 child: Row(
@@ -352,7 +383,12 @@ class _DepositScreenState extends State<DepositScreen> {
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    Expanded(child: Text(name, overflow: TextOverflow.ellipsis)),
+                                    Expanded(
+                                      child: Text(
+                                        name,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
                                   ],
                                 ),
                               );
@@ -360,7 +396,7 @@ class _DepositScreenState extends State<DepositScreen> {
                             onChanged: (val) =>
                                 setState(() => _selectedMethod = val!),
                           );
-                        }
+                        },
                       ),
                       const SizedBox(height: 20),
 
@@ -451,8 +487,9 @@ class _DepositScreenState extends State<DepositScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.green.shade200
-                                          .withOpacity(0.5),
+                                      color: Colors.green.shade200.withOpacity(
+                                        0.5,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -540,6 +577,143 @@ class _CustomHeader extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+/// Currency Input Field with proper placeholder behavior
+class CurrencyInputField extends StatefulWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool isDarkMode;
+  final String? Function(String?)? validator;
+
+  const CurrencyInputField({
+    Key? key,
+    required this.label,
+    required this.controller,
+    required this.isDarkMode,
+    this.validator,
+  }) : super(key: key);
+
+  @override
+  State<CurrencyInputField> createState() => _CurrencyInputFieldState();
+}
+
+class _CurrencyInputFieldState extends State<CurrencyInputField> {
+  bool _isFocused = false;
+  final FocusNode _focusNode = FocusNode();
+  final _currencyFormat = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: 'Rp ',
+    decimalDigits: 0,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    setState(() {
+      _isFocused = _focusNode.hasFocus;
+    });
+  }
+
+  void _formatCurrency(String value) {
+    if (value.isEmpty) return;
+
+    final numericValue = value.replaceAll(RegExp('[^0-9]'), '');
+    if (numericValue.isNotEmpty) {
+      final formatted = _currencyFormat.format(int.parse(numericValue));
+      final cleanText = formatted.replaceAll('Rp ', '').trim();
+      widget.controller.value = TextEditingValue(
+        text: cleanText,
+        selection: TextSelection.fromPosition(
+          TextPosition(offset: cleanText.length),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = widget.controller.text.isNotEmpty;
+    final showPrefix = _isFocused || hasValue;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: widget.controller,
+          focusNode: _focusNode,
+          decoration: InputDecoration(
+            hintText: showPrefix ? '' : 'Contoh: Rp 1.000.000',
+            hintStyle: TextStyle(
+              color: widget.isDarkMode
+                  ? Colors.grey.shade500
+                  : Colors.grey.shade400,
+              fontStyle: FontStyle.italic,
+            ),
+            prefixText: showPrefix ? 'Rp ' : null,
+            prefixStyle: TextStyle(
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Icon(
+              Icons.payments_rounded,
+              color: _isFocused ? Colors.lightGreen.shade700 : Colors.grey,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: widget.isDarkMode
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade300,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: widget.isDarkMode
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade300,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: Colors.lightGreen.shade700,
+                width: 2,
+              ),
+            ),
+            filled: true,
+            fillColor: widget.isDarkMode
+                ? Colors.grey.shade800.withOpacity(0.3)
+                : Colors.grey.shade50,
+          ),
+          keyboardType: TextInputType.number,
+          onChanged: _formatCurrency,
+          validator: widget.validator,
+        ),
+      ],
     );
   }
 }

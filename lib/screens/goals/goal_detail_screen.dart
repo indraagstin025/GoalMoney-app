@@ -21,7 +21,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
     symbol: 'Rp ',
     decimalDigits: 0,
   );
-  
+
   File? _goalImage;
   bool _imageExists = false;
 
@@ -34,6 +34,12 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
         context,
         listen: false,
       ).fetchTransactions(widget.goal.id),
+    );
+    Future.microtask(
+      () => Provider.of<GoalProvider>(
+        context,
+        listen: false,
+      ).fetchForecasts(goalId: widget.goal.id),
     );
   }
 
@@ -64,7 +70,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -81,8 +87,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                     context,
                     listen: false,
                   ).fetchTransactions(widget.goal.id);
-                  await Provider.of<GoalProvider>(context, listen: false)
-                      .fetchGoals();
+                  await Provider.of<GoalProvider>(
+                    context,
+                    listen: false,
+                  ).fetchGoals();
                 },
                 child: Consumer<TransactionProvider>(
                   builder: (context, transactionProvider, _) {
@@ -102,7 +110,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                                   borderRadius: BorderRadius.circular(20),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.green.shade200.withOpacity(0.4),
+                                      color: Colors.green.shade200.withOpacity(
+                                        0.4,
+                                      ),
                                       blurRadius: 15,
                                       offset: const Offset(0, 6),
                                     ),
@@ -121,6 +131,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                             goal: widget.goal,
                             currencyFormat: _currencyFormat,
                           ),
+                          const SizedBox(height: 16),
+
+                          // Forecast Section
+                          _ForecastSection(goalId: widget.goal.id),
                           const SizedBox(height: 32),
 
                           // Transaction History Header
@@ -139,10 +153,9 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                                   style: TextStyle(
                                     fontSize: 20,
                                     fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.color,
+                                    color: Theme.of(
+                                      context,
+                                    ).textTheme.titleLarge?.color,
                                   ),
                                 ),
                               ],
@@ -159,28 +172,34 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                               ),
                             )
                           else if (transactionProvider.transactions.isEmpty)
-                             _EmptyTransactionState(isDarkMode: isDarkMode)
+                            _EmptyTransactionState(isDarkMode: isDarkMode)
                           else
                             ListView.separated(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 24, vertical: 8),
+                                horizontal: 24,
+                                vertical: 8,
+                              ),
                               itemCount:
                                   transactionProvider.transactions.length,
                               separatorBuilder: (_, __) =>
                                   const SizedBox(height: 12),
                               itemBuilder: (context, index) {
-                                final transaction = transactionProvider
-                                    .transactions[index];
+                                final transaction =
+                                    transactionProvider.transactions[index];
                                 return TransactionCard(
                                   key: ValueKey(transaction.id),
-                                  description: transaction.description ?? 'Deposit',
+                                  description:
+                                      transaction.description ?? 'Deposit',
                                   amount: transaction.amount,
-                                  date: DateTime.parse(transaction.transactionDate),
+                                  date: DateTime.parse(
+                                    transaction.transactionDate,
+                                  ),
                                   isDarkMode: isDarkMode,
                                   transactionId: transaction.id,
                                   goalId: widget.goal.id,
+                                  goal: widget.goal,
                                 );
                               },
                             ),
@@ -203,11 +222,8 @@ class _CustomHeader extends StatelessWidget {
   final Goal goal;
   final bool isDarkMode;
 
-  const _CustomHeader({
-    Key? key,
-    required this.goal,
-    required this.isDarkMode,
-  }) : super(key: key);
+  const _CustomHeader({Key? key, required this.goal, required this.isDarkMode})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -237,14 +253,14 @@ class _CustomHeader extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                if (goal.description != null &&
-                    goal.description!.isNotEmpty)
+                if (goal.description != null && goal.description!.isNotEmpty)
                   Text(
                     goal.description!,
                     style: TextStyle(
                       fontSize: 13,
-                      color:
-                          isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                      color: isDarkMode
+                          ? Colors.grey.shade400
+                          : Colors.grey.shade600,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -294,10 +310,7 @@ class _BalanceCard extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Colors.green.shade700,
-              Colors.green.shade500,
-            ],
+            colors: [Colors.green.shade700, Colors.green.shade500],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -361,8 +374,9 @@ class _BalanceCard extends StatelessWidget {
                     value: goal.progress / 100,
                     minHeight: 12,
                     backgroundColor: Colors.white.withOpacity(0.3),
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.white,
+                    ),
                   ),
                 ),
               ],
@@ -407,7 +421,8 @@ class _BalanceCard extends StatelessWidget {
 class _EmptyTransactionState extends StatelessWidget {
   final bool isDarkMode;
 
-  const _EmptyTransactionState({Key? key, required this.isDarkMode}) : super(key: key);
+  const _EmptyTransactionState({Key? key, required this.isDarkMode})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -438,9 +453,7 @@ class _EmptyTransactionState extends StatelessWidget {
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: isDarkMode
-                  ? Colors.grey.shade400
-                  : Colors.grey.shade600,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
           ),
         ],
@@ -456,6 +469,7 @@ class TransactionCard extends StatelessWidget {
   final bool isDarkMode;
   final int transactionId;
   final int goalId;
+  final Goal goal;
 
   const TransactionCard({
     Key? key,
@@ -465,6 +479,7 @@ class TransactionCard extends StatelessWidget {
     required this.isDarkMode,
     required this.transactionId,
     required this.goalId,
+    required this.goal,
   }) : super(key: key);
 
   @override
@@ -476,8 +491,13 @@ class TransactionCard extends StatelessWidget {
     );
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
 
+    // Check if transaction can be deleted
+    final canDelete = goal.type == 'cash' || goal.isCompleted;
+
     return GestureDetector(
-      onLongPress: () => _showDeleteDialog(context),
+      onLongPress: canDelete
+          ? () => _showDeleteDialog(context)
+          : () => _showCannotDeleteMessage(context),
       child: Container(
         decoration: BoxDecoration(
           color: isDarkMode ? Colors.grey.shade800 : Colors.white,
@@ -559,13 +579,32 @@ class TransactionCard extends StatelessWidget {
     );
   }
 
+  void _showCannotDeleteMessage(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.lock_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                'Transaksi dari goal digital (e-wallet) tidak dapat dihapus hingga goal tercapai untuk menjaga integritas keuangan.',
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: Colors.orange.shade700,
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
   void _showDeleteDialog(BuildContext context) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
             Icon(Icons.delete_outline, color: Colors.red.shade700),
@@ -584,7 +623,10 @@ class TransactionCard extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(ctx);
-              final transactionProvider = Provider.of<TransactionProvider>(context, listen: false);
+              final transactionProvider = Provider.of<TransactionProvider>(
+                context,
+                listen: false,
+              );
               await transactionProvider.deleteTransaction(
                 transactionId,
                 goalId,
@@ -612,5 +654,213 @@ class TransactionCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _ForecastSection extends StatelessWidget {
+  final int goalId;
+
+  const _ForecastSection({required this.goalId});
+
+  @override
+  Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
+    return Consumer<GoalProvider>(
+      builder: (context, goalProvider, _) {
+        if (goalProvider.isLoadingForecast) {
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+
+        final forecast = goalProvider.getForecastForGoal(goalId);
+        if (forecast == null) return const SizedBox.shrink();
+
+        final status = forecast['status'] ?? 'unknown';
+        final color = _getStatusColor(status);
+        final icon = _getStatusIcon(status);
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDarkMode ? Colors.grey.shade900 : Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: color.withOpacity(0.3), width: 1.5),
+              boxShadow: [
+                BoxShadow(
+                  color: color.withOpacity(0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: Icon(icon, color: color, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Prediksi Goal Intelligence',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    _buildStatusChip(status, color),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  forecast['description'] ?? '',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDarkMode
+                        ? Colors.grey.shade300
+                        : Colors.grey.shade700,
+                    height: 1.4,
+                  ),
+                ),
+                if (forecast['predicted_completion_date'] != null) ...[
+                  const SizedBox(height: 16),
+                  const Divider(height: 1),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Estimasi Selesai',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDarkMode
+                                  ? Colors.grey.shade500
+                                  : Colors.grey.shade600,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatDate(forecast['predicted_completion_date']),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            'Sisa Hari',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDarkMode
+                                  ? Colors.grey.shade500
+                                  : Colors.grey.shade600,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${forecast['days_to_complete']} Hari',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatusChip(String status, Color color) {
+    String label = status.replaceAll('_', ' ').toUpperCase();
+    if (status == 'ahead_of_schedule') label = '🏎️ AHEAD';
+    if (status == 'on_track') label = '✅ ON TRACK';
+    if (status == 'falling_behind') label = '📈 BEHIND';
+    if (status == 'overdue') label = '🚨 OVERDUE';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+
+  Color _getStatusColor(String status) {
+    switch (status) {
+      case 'ahead_of_schedule':
+        return Colors.blue;
+      case 'on_track':
+        return Colors.green;
+      case 'falling_behind':
+        return Colors.orange;
+      case 'overdue':
+        return Colors.red;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status) {
+      case 'ahead_of_schedule':
+        return Icons.speed_rounded;
+      case 'on_track':
+        return Icons.check_circle_outline_rounded;
+      case 'falling_behind':
+        return Icons.trending_up_rounded;
+      case 'overdue':
+        return Icons.warning_amber_rounded;
+      default:
+        return Icons.psychology_rounded;
+    }
+  }
+
+  String _formatDate(String? dateStr) {
+    if (dateStr == null) return '-';
+    try {
+      final date = DateTime.parse(dateStr);
+      return DateFormat('dd MMM yyyy').format(date);
+    } catch (_) {
+      return dateStr;
+    }
   }
 }

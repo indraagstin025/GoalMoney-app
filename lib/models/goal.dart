@@ -38,4 +38,6 @@ class Goal {
   double get progress => (progressPercentage is num)
       ? (progressPercentage as num).toDouble()
       : 0.0;
+
+  bool get isCompleted => progress >= 100.0;
 }

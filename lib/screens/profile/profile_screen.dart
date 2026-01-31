@@ -5,6 +5,9 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/validators.dart';
 import '../../core/photo_storage_service.dart';
+import '../../providers/badge_provider.dart';
+import '../../providers/goal_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../auth/login_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -244,7 +247,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   offset: const Offset(0, 5),
                 ),
               ],
-              image: _profilePhotoPath != null &&
+              image:
+                  _profilePhotoPath != null &&
                       File(_profilePhotoPath!).existsSync()
                   ? DecorationImage(
                       image: FileImage(File(_profilePhotoPath!)),
@@ -252,13 +256,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     )
                   : null,
             ),
-            child: _profilePhotoPath == null ||
+            child:
+                _profilePhotoPath == null ||
                     !File(_profilePhotoPath!).existsSync()
-                ? const Icon(
-                    Icons.person,
-                    size: 60,
-                    color: Colors.white,
-                  )
+                ? const Icon(Icons.person, size: 60, color: Colors.white)
                 : null,
           ),
           Container(
@@ -355,11 +356,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             color: Colors.green.shade50,
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(
-            icon,
-            color: Colors.green.shade700,
-            size: 20,
-          ),
+          child: Icon(icon, color: Colors.green.shade700, size: 20),
         ),
         const SizedBox(width: 16),
         Expanded(
@@ -370,7 +367,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
+                  color: isDarkMode
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade600,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -551,10 +550,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                   child: const Text(
                     'Batal',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -704,6 +700,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     applicationName: 'GoalMoney',
                     applicationVersion: '1.0.0',
                     applicationLegalese: '© 2024 GoalMoney',
+                    children: [
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Author:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Text('Indra Agustin - 714230051'),
+                      const Text('Efendi Sugiantoro - 714230018'),
+                    ],
                   );
                 },
               ),
@@ -725,9 +730,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       title: const Text('Logout?'),
-                      content: const Text(
-                        'Apakah Anda yakin ingin logout?',
-                      ),
+                      content: const Text('Apakah Anda yakin ingin logout?'),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
@@ -745,12 +748,34 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   );
 
                   if (shouldLogout == true && mounted) {
-                    await Provider.of<AuthProvider>(
+                    final authProvider = Provider.of<AuthProvider>(
                       context,
                       listen: false,
-                    ).logout();
+                    );
+                    final goalProvider = Provider.of<GoalProvider>(
+                      context,
+                      listen: false,
+                    );
+                    final badgeProvider = Provider.of<BadgeProvider>(
+                      context,
+                      listen: false,
+                    );
+                    final transactionProvider =
+                        Provider.of<TransactionProvider>(
+                          context,
+                          listen: false,
+                        );
+
+                    // 1. Clear all user-specific data first (synchronous)
+                    goalProvider.clear();
+                    badgeProvider.clear();
+                    transactionProvider.clear();
+
+                    // 2. Then perform logout (async)
+                    await authProvider.logout();
 
                     if (mounted) {
+                      // 3. Hard reset navigation to LoginScreen
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(
                           builder: (context) => const LoginScreen(),
@@ -785,11 +810,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: (iconColor ?? Colors.green.shade700).withOpacity(0.1),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(
-          icon,
-          color: iconColor ?? Colors.green.shade700,
-          size: 24,
-        ),
+        child: Icon(icon, color: iconColor ?? Colors.green.shade700, size: 24),
       ),
       title: Text(
         title,
@@ -799,7 +820,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           color: titleColor ?? Theme.of(context).textTheme.bodyLarge?.color,
         ),
       ),
-      trailing: trailing ??
+      trailing:
+          trailing ??
           Icon(
             Icons.arrow_forward_ios_rounded,
             size: 16,
