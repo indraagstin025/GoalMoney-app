@@ -4,6 +4,8 @@ import 'package:intl/intl.dart';
 import '../providers/goal_provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/goal.dart';
+import '../providers/badge_provider.dart';
+import '../widgets/badge_celebration_dialog.dart';
 import '../screens/withdrawals/withdrawal_screen.dart';
 
 class OverflowAllocationDialog extends StatefulWidget {
@@ -47,10 +49,12 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
   Future<void> _loadAvailableGoals() async {
     try {
       final goalProvider = Provider.of<GoalProvider>(context, listen: false);
-      
+
       // Check if there are ANY incomplete goals before filtering
-      final allIncomplete = goalProvider.goals.where((g) => g.currentAmount < g.targetAmount).toList();
-      
+      final allIncomplete = goalProvider.goals
+          .where((g) => g.currentAmount < g.targetAmount)
+          .toList();
+
       // Filter goals by TYPE
       availableGoals = allIncomplete.where((g) {
         // Must match source type (Cash for Cash, Digital for Digital)
@@ -124,10 +128,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
             );
           }
 
-          allocations.add({
-            'goal_id': goal.id,
-            'amount': amount,
-          });
+          allocations.add({'goal_id': goal.id, 'amount': amount});
         }
       }
 
@@ -145,22 +146,47 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
       );
 
       if (mounted && response['available_balance'] != null) {
-         final newBalance = (response['available_balance'] is num)
+        final newBalance = (response['available_balance'] is num)
             ? (response['available_balance'] as num).toDouble()
             : 0.0;
-         Provider.of<AuthProvider>(context, listen: false)
-            .setAvailableBalance(newBalance);
+        Provider.of<AuthProvider>(
+          context,
+          listen: false,
+        ).setAvailableBalance(newBalance);
       }
 
       if (mounted) {
-        Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Overflow berhasil dialokasikan! 🎉'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        // --- NEW: Trigger Badge Check ---
+        try {
+          final badgeProvider = Provider.of<BadgeProvider>(
+            context,
+            listen: false,
+          );
+          final newBadges = await badgeProvider.checkAndAwardBadges();
+
+          if (newBadges.isNotEmpty && mounted) {
+            await showDialog(
+              context: context,
+              barrierDismissible: false,
+              builder: (context) =>
+                  BadgeCelebrationDialog(newBadges: newBadges),
+            );
+          }
+        } catch (e) {
+          debugPrint('[OverflowDialog] Badge check error: $e');
+        }
+        // -------------------------------
+
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Overflow berhasil dialokasikan! 🎉'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -179,14 +205,172 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
     }
   }
 
+  /// Handle quick action for save to balance or withdraw
+  Future<void> _handleQuickAction({required bool toBalance}) async {
+    if (isSubmitting) return;
+
+    if (toBalance) {
+      // Save all remaining to balance
+      setState(() => isSubmitting = true);
+      try {
+        final response = await Provider.of<GoalProvider>(context, listen: false)
+            .allocateOverflow(
+              allocations: [],
+              saveToBalanceAmount: remainingOverflow > 0
+                  ? remainingOverflow
+                  : null,
+            );
+
+        if (mounted && response['available_balance'] != null) {
+          final newBalance = (response['available_balance'] is num)
+              ? (response['available_balance'] as num).toDouble()
+              : 0.0;
+          Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          ).setAvailableBalance(newBalance);
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Sisa telah dipindahkan ke saldo akun.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+          // --- NEW: Trigger Badge Check ---
+          try {
+            final badgeProvider = Provider.of<BadgeProvider>(
+              context,
+              listen: false,
+            );
+            badgeProvider.checkAndAwardBadges().then((newBadges) {
+              if (newBadges.isNotEmpty && mounted) {
+                showBadgeCelebration(context, newBadges);
+              }
+            });
+          } catch (e) {
+            print('[OverflowDialog] Badge check error: $e');
+          }
+          // -------------------------------
+
+          Navigator.of(context).pop();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) setState(() => isSubmitting = false);
+      }
+    } else {
+      // Withdraw - depends on source method
+      if (widget.sourceMethod == 'manual') {
+        // Manual cash - ambil tunai langsung
+        setState(() => isSubmitting = true);
+        try {
+          await Provider.of<GoalProvider>(
+            context,
+            listen: false,
+          ).requestWithdrawal(
+            goalId: null,
+            amount: remainingOverflow,
+            method: 'manual',
+            notes: 'Ambil tunai sisa overflow dari ${widget.completedGoalName}',
+          );
+          await Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          ).fetchProfile();
+
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Sisa dana tunai telah diambil kembali'),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => isSubmitting = false);
+        }
+      } else {
+        // Digital - navigate to withdrawal screen
+        setState(() => isSubmitting = true);
+        try {
+          final response =
+              await Provider.of<GoalProvider>(
+                context,
+                listen: false,
+              ).allocateOverflow(
+                allocations: [],
+                saveToBalanceAmount: remainingOverflow,
+              );
+
+          if (mounted && response['available_balance'] != null) {
+            final newBalance = (response['available_balance'] is num)
+                ? (response['available_balance'] as num).toDouble()
+                : 0.0;
+            Provider.of<AuthProvider>(
+              context,
+              listen: false,
+            ).setAvailableBalance(newBalance);
+          }
+
+          if (mounted) {
+            Navigator.pop(context);
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => WithdrawalScreen(
+                  prefilledAmount: remainingOverflow,
+                  fromOverflow: true,
+                ),
+              ),
+            );
+          }
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        } finally {
+          if (mounted) setState(() => isSubmitting = false);
+        }
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
     return AlertDialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -232,91 +416,151 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
               child: Center(child: CircularProgressIndicator()),
             )
           : availableGoals.isEmpty
-              // CASE: All goals completed or incompatible - offer withdrawal option
-              ? _AllGoalsCompletedView(
-                  overflowAmount: widget.overflowAmount,
-                  isDarkMode: isDarkMode,
-                  currencyFormat: _currencyFormat,
-                  sourceMethod: widget.sourceMethod, // Pass sourceMethod
-                  hasIncompatibleGoals: hasIncompatibleGoals, // Pass flag
-                  onSubmit: (bool toBalance) async {
-                       _handleAllCompletedSubmission(toBalance);
-                  },
-              )
-              // CASE: Goals available for allocation
-              : SingleChildScrollView(
-                  child: SizedBox(
-                    width: double.maxFinite,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Info Card
-                        Container(
-                          margin: const EdgeInsets.symmetric(horizontal: 24),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.green.shade50,
-                                Colors.green.shade100.withOpacity(0.3),
-                              ],
+          // CASE: All goals completed or incompatible - offer withdrawal option
+          ? _AllGoalsCompletedView(
+              overflowAmount: widget.overflowAmount,
+              isDarkMode: isDarkMode,
+              currencyFormat: _currencyFormat,
+              sourceMethod: widget.sourceMethod, // Pass sourceMethod
+              hasIncompatibleGoals: hasIncompatibleGoals, // Pass flag
+              onSubmit: (bool toBalance) async {
+                _handleAllCompletedSubmission(toBalance);
+              },
+            )
+          // CASE: Goals available for allocation
+          : SingleChildScrollView(
+              child: SizedBox(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Info Card - Improved contrast
+                    Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 24),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDarkMode
+                            ? Colors.blue.shade900.withOpacity(0.4)
+                            : Colors.blue.shade50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDarkMode
+                              ? Colors.blue.shade400
+                              : Colors.blue.shade200,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.info_outline_rounded,
+                            color: isDarkMode
+                                ? Colors.blue.shade200
+                                : Colors.blue.shade700,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Anda memiliki sisa ${_currencyFormat.format(widget.overflowAmount)} untuk dialokasikan',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                                color: isDarkMode
+                                    ? Colors.blue.shade100
+                                    : Colors.blue.shade900,
+                              ),
                             ),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.green.shade200),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                Icons.info_outline_rounded,
-                                color: Colors.green.shade700,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Anda memiliki sisa ${_currencyFormat.format(widget.overflowAmount)} untuk dialokasikan',
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.green.shade900,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        
-                        // Default padding for list
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: availableGoals.map((goal) {
-                              return AllocationGoalItem(
-                                key: ValueKey(goal.id),
-                                goal: goal,
-                                controller: controllers[goal.id]!,
-                                currencyFormat: _currencyFormat,
-                                isDarkMode: isDarkMode,
-                                onChanged: (_) => _calculateRemaining(),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-
-                        const Divider(height: 24),
-
-                        // Remaining Summary
-                        _SummarySection(
-                          remainingOverflow: remainingOverflow,
-                          isDarkMode: isDarkMode,
-                          currencyFormat: _currencyFormat,
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: 20),
+
+                    // Default padding for list
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: availableGoals.map((goal) {
+                          return AllocationGoalItem(
+                            key: ValueKey(goal.id),
+                            goal: goal,
+                            controller: controllers[goal.id]!,
+                            currencyFormat: _currencyFormat,
+                            isDarkMode: isDarkMode,
+                            onChanged: (_) => _calculateRemaining(),
+                          );
+                        }).toList(),
+                      ),
+                    ),
+
+                    const Divider(height: 24),
+
+                    // Remaining Summary
+                    _SummarySection(
+                      remainingOverflow: remainingOverflow,
+                      isDarkMode: isDarkMode,
+                      currencyFormat: _currencyFormat,
+                    ),
+
+                    // Quick Action Buttons
+                    if (remainingOverflow > 0) ...[
+                      const SizedBox(height: 20),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Atau langsung:',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            // Save to Balance Button
+                            if (widget.sourceMethod != 'manual')
+                              _QuickActionButton(
+                                icon: Icons.account_balance_wallet,
+                                label: 'Simpan ke Saldo Akun',
+                                subtitle: 'Semua sisa dana ke saldo',
+                                color: Colors.blue,
+                                isDarkMode: isDarkMode,
+                                onTap: () =>
+                                    _handleQuickAction(toBalance: true),
+                              ),
+                            if (widget.sourceMethod != 'manual')
+                              const SizedBox(height: 8),
+                            // Withdraw Button
+                            _QuickActionButton(
+                              icon: widget.sourceMethod == 'manual'
+                                  ? Icons.money_rounded
+                                  : Icons.payments_outlined,
+                              label: widget.sourceMethod == 'manual'
+                                  ? 'Ambil Kembalian Tunai'
+                                  : 'Tarik Dana',
+                              subtitle: widget.sourceMethod == 'manual'
+                                  ? 'Uang tunai tidak disetorkan'
+                                  : 'Transfer ke E-Wallet',
+                              color: widget.sourceMethod == 'manual'
+                                  ? Colors.green
+                                  : Colors.orange,
+                              isDarkMode: isDarkMode,
+                              onTap: () => _handleQuickAction(toBalance: false),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
+              ),
+            ),
       actions: availableGoals.isEmpty
           ? [
               TextButton(
@@ -326,8 +570,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
             ]
           : [
               TextButton(
-                onPressed:
-                    isSubmitting ? null : () => Navigator.pop(context),
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
                 child: const Text('Batal'),
               ),
               ElevatedButton(
@@ -357,155 +600,158 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
   }
 
   Future<void> _handleAllCompletedSubmission(bool toBalance) async {
-       if (toBalance) {
-          // Option 1
-          final remaining = widget.overflowAmount;
+    if (toBalance) {
+      // Option 1
+      final remaining = widget.overflowAmount;
 
-          setState(() => isSubmitting = true);
-          try {
-            final allocations = <Map<String, dynamic>>[];
+      setState(() => isSubmitting = true);
+      try {
+        final allocations = <Map<String, dynamic>>[];
 
-            final response = await Provider.of<GoalProvider>(context,
-                    listen: false)
-                .allocateOverflow(
+        final response = await Provider.of<GoalProvider>(context, listen: false)
+            .allocateOverflow(
               allocations: allocations,
-              saveToBalanceAmount:
-                  remaining > 0 ? remaining : null,
+              saveToBalanceAmount: remaining > 0 ? remaining : null,
             );
 
-            if (mounted && response['available_balance'] != null) {
-                final newBalance = (response['available_balance'] is num)
-                  ? (response['available_balance'] as num).toDouble()
-                  : 0.0;
-                Provider.of<AuthProvider>(context, listen: false)
-                  .setAvailableBalance(newBalance);
-            }
+        if (mounted && response['available_balance'] != null) {
+          final newBalance = (response['available_balance'] is num)
+              ? (response['available_balance'] as num).toDouble()
+              : 0.0;
+          Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          ).setAvailableBalance(newBalance);
+        }
 
-            if (mounted) {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Dana disimpan sebagai Available Balance'),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(e
-                      .toString()
-                      .replaceAll('Exception: ', '')),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          } finally {
-            if (mounted) {
-              setState(() => isSubmitting = false);
-            }
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Dana disimpan sebagai Available Balance'),
+              backgroundColor: Colors.green,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => isSubmitting = false);
+        }
+      }
+    } else {
+      // Option 2 (Withdraw)
+      // If source is manual, we treat this as "Ambil Tunai" (Manual Withdrawal)
+      // immediately without going to Withdrawal Screen.
+      if (widget.sourceMethod == 'manual') {
+        setState(() => isSubmitting = true);
+        try {
+          // Request manual withdrawal to deduct the balance that was just added
+          await Provider.of<GoalProvider>(
+            context,
+            listen: false,
+          ).requestWithdrawal(
+            // No goal ID (withdraw from balance)
+            // Wait, goalId check in provider supports null? Yes, we fixed it.
+            goalId: null,
+            amount: widget.overflowAmount,
+            method: 'manual',
+            notes: 'Ambil tunai sisa overflow dari ${widget.completedGoalName}',
+          );
+
+          // No need to setAvailableBalance explicitly as requestWithdrawal likely doesn't return it
+          // But we should refresh profile? Or just assume it's deducted.
+          // Actually requestWithdrawal response might not contain new balance.
+          // We should fetch profile.
+          await Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          ).fetchProfile();
+
+          if (mounted) {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Sisa dana tunai telah diambil kembali'),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
           }
-       } else {
-          // Option 2 (Withdraw)
-          // If source is manual, we treat this as "Ambil Tunai" (Manual Withdrawal)
-          // immediately without going to Withdrawal Screen.
-          if (widget.sourceMethod == 'manual') {
-             setState(() => isSubmitting = true);
-             try {
-                // Request manual withdrawal to deduct the balance that was just added
-                await Provider.of<GoalProvider>(context, listen: false)
-                  .requestWithdrawal(
-                    // No goal ID (withdraw from balance)
-                    // Wait, goalId check in provider supports null? Yes, we fixed it.
-                    goalId: null, 
-                    amount: widget.overflowAmount,
-                    method: 'manual',
-                    notes: 'Ambil tunai sisa overflow dari ${widget.completedGoalName}',
-                  );
-
-                // No need to setAvailableBalance explicitly as requestWithdrawal likely doesn't return it
-                // But we should refresh profile? Or just assume it's deducted.
-                // Actually requestWithdrawal response might not contain new balance.
-                // We should fetch profile.
-                await Provider.of<AuthProvider>(context, listen: false).fetchProfile();
-
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Sisa dana tunai telah diambil kembali'),
-                      backgroundColor: Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-             } catch(e) {
-                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(e.toString().replaceAll('Exception: ', '')),
-                      backgroundColor: Colors.red,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                }
-             } finally {
-                if(mounted) setState(() => isSubmitting = false);
-             }
-             return;
+        } catch (e) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString().replaceAll('Exception: ', '')),
+                backgroundColor: Colors.red,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
           }
+        } finally {
+          if (mounted) setState(() => isSubmitting = false);
+        }
+        return;
+      }
 
-          // Existing logic for other methods (Navigate to Withdrawal Screen)
-          setState(() => isSubmitting = true);
-          try {
-            final response = await Provider.of<GoalProvider>(context,
-                    listen: false)
-                .allocateOverflow(
+      // Existing logic for other methods (Navigate to Withdrawal Screen)
+      setState(() => isSubmitting = true);
+      try {
+        final response = await Provider.of<GoalProvider>(context, listen: false)
+            .allocateOverflow(
               allocations: [],
               saveToBalanceAmount: widget.overflowAmount,
             );
-            
-            if (mounted && response['available_balance'] != null) {
-                final newBalance = (response['available_balance'] is num)
-                  ? (response['available_balance'] as num).toDouble()
-                  : 0.0;
-                Provider.of<AuthProvider>(context, listen: false)
-                  .setAvailableBalance(newBalance);
-            }
 
-            if (mounted) {
-              Navigator.pop(context); // Close dialog
+        if (mounted && response['available_balance'] != null) {
+          final newBalance = (response['available_balance'] is num)
+              ? (response['available_balance'] as num).toDouble()
+              : 0.0;
+          Provider.of<AuthProvider>(
+            context,
+            listen: false,
+          ).setAvailableBalance(newBalance);
+        }
 
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => WithdrawalScreen(
-                    prefilledAmount: widget.overflowAmount,
-                    fromOverflow: true,
-                  ),
-                ),
-              );
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(
-                      e.toString().replaceAll('Exception: ', '')),
-                  backgroundColor: Colors.red,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            }
-          } finally {
-            if (mounted) {
-              setState(() => isSubmitting = false);
-            }
-          }
-       }
+        if (mounted) {
+          Navigator.pop(context); // Close dialog
+
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => WithdrawalScreen(
+                prefilledAmount: widget.overflowAmount,
+                fromOverflow: true,
+              ),
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString().replaceAll('Exception: ', '')),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        if (mounted) {
+          setState(() => isSubmitting = false);
+        }
+      }
+    }
   }
 
   @override
@@ -536,7 +782,7 @@ class AllocationGoalItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final remaining = goal.targetAmount - goal.currentAmount;
-    
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Column(
@@ -573,9 +819,7 @@ class AllocationGoalItem extends StatelessWidget {
             'Sisa target: ${currencyFormat.format(remaining)}',
             style: TextStyle(
               fontSize: 12,
-              color: isDarkMode
-                  ? Colors.grey.shade400
-                  : Colors.grey.shade600,
+              color: isDarkMode ? Colors.grey.shade400 : Colors.grey.shade600,
             ),
           ),
           const SizedBox(height: 8),
@@ -585,12 +829,8 @@ class AllocationGoalItem extends StatelessWidget {
             decoration: InputDecoration(
               hintText: '0',
               prefixText: 'Rp ',
-              suffixText:
-                  'max ${currencyFormat.format(remaining)}',
-              suffixStyle: TextStyle(
-                fontSize: 11,
-                color: Colors.grey.shade500,
-              ),
+              suffixText: 'max ${currencyFormat.format(remaining)}',
+              suffixStyle: TextStyle(fontSize: 11, color: Colors.grey.shade500),
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
@@ -600,10 +840,7 @@ class AllocationGoalItem extends StatelessWidget {
               ),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(
-                  color: Colors.green.shade700,
-                  width: 2,
-                ),
+                borderSide: BorderSide(color: Colors.green.shade700, width: 2),
               ),
             ),
             onChanged: onChanged,
@@ -628,6 +865,8 @@ class _SummarySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isNegative = remainingOverflow < 0;
+
     return Column(
       children: [
         Padding(
@@ -635,16 +874,20 @@ class _SummarySection extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: remainingOverflow < 0
-                  ? Colors.red.shade50
+              color: isNegative
+                  ? (isDarkMode
+                        ? Colors.red.shade900.withOpacity(0.4)
+                        : Colors.red.shade50)
                   : (isDarkMode
-                      ? Colors.green.shade900.withOpacity(0.3)
-                      : Colors.green.shade50),
+                        ? Colors.teal.shade900.withOpacity(0.4)
+                        : Colors.teal.shade50),
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color: remainingOverflow < 0
-                    ? Colors.red.shade300
-                    : Colors.green.shade300,
+                color: isNegative
+                    ? (isDarkMode ? Colors.red.shade400 : Colors.red.shade300)
+                    : (isDarkMode
+                          ? Colors.teal.shade400
+                          : Colors.teal.shade300),
                 width: 1.5,
               ),
             ),
@@ -659,11 +902,13 @@ class _SummarySection extends StatelessWidget {
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
                           fontSize: 14,
-                          color: remainingOverflow < 0
-                              ? Colors.red.shade900
+                          color: isNegative
+                              ? (isDarkMode
+                                    ? Colors.red.shade200
+                                    : Colors.red.shade900)
                               : (isDarkMode
-                                  ? Colors.green.shade100
-                                  : Colors.green.shade900),
+                                    ? Colors.teal.shade100
+                                    : Colors.teal.shade900),
                         ),
                       ),
                     ),
@@ -673,9 +918,13 @@ class _SummarySection extends StatelessWidget {
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
-                        color: remainingOverflow < 0
-                            ? Colors.red.shade700
-                            : Colors.green.shade700,
+                        color: isNegative
+                            ? (isDarkMode
+                                  ? Colors.red.shade300
+                                  : Colors.red.shade700)
+                            : (isDarkMode
+                                  ? Colors.teal.shade200
+                                  : Colors.teal.shade700),
                       ),
                     ),
                   ],
@@ -686,13 +935,12 @@ class _SummarySection extends StatelessWidget {
         ),
         if (remainingOverflow < 0)
           Padding(
-            padding: const EdgeInsets.only(
-                top: 12, left: 24, right: 24),
+            padding: const EdgeInsets.only(top: 12, left: 24, right: 24),
             child: Row(
               children: [
                 Icon(
                   Icons.warning_rounded,
-                  color: Colors.red.shade700,
+                  color: isDarkMode ? Colors.red.shade300 : Colors.red.shade700,
                   size: 16,
                 ),
                 const SizedBox(width: 6),
@@ -700,7 +948,9 @@ class _SummarySection extends StatelessWidget {
                   child: Text(
                     'Total alokasi melebihi overflow!',
                     style: TextStyle(
-                      color: Colors.red.shade700,
+                      color: isDarkMode
+                          ? Colors.red.shade300
+                          : Colors.red.shade700,
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
                     ),
@@ -741,17 +991,28 @@ class _AllGoalsCompletedView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Success Banner - Improved contrast
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: isDarkMode
+                    ? Colors.green.shade900.withOpacity(0.4)
+                    : Colors.green.shade50,
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                border: Border.all(
+                  color: isDarkMode
+                      ? Colors.green.shade400
+                      : Colors.green.shade200,
+                ),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.celebration,
-                      color: Colors.green.shade700),
+                  Icon(
+                    Icons.celebration,
+                    color: isDarkMode
+                        ? Colors.green.shade300
+                        : Colors.green.shade700,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -759,34 +1020,52 @@ class _AllGoalsCompletedView extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Colors.green.shade900,
+                        color: isDarkMode
+                            ? Colors.green.shade100
+                            : Colors.green.shade900,
                       ),
                     ),
                   ),
                 ],
               ),
             ),
-            
+
             // Warning if incompatible goals exist
             if (hasIncompatibleGoals)
               Container(
                 margin: const EdgeInsets.only(top: 16),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: isDarkMode
+                      ? Colors.orange.shade900.withOpacity(0.4)
+                      : Colors.orange.shade50,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(
+                    color: isDarkMode
+                        ? Colors.orange.shade400
+                        : Colors.orange.shade200,
+                  ),
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.warning_amber_rounded, size: 20, color: Colors.orange.shade800),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      size: 20,
+                      color: isDarkMode
+                          ? Colors.orange.shade300
+                          : Colors.orange.shade800,
+                    ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'Terdapat goal lain yang belum selesai, namun tipenya berbeda (${sourceMethod == 'manual' ? "Digital" : "Tunai"}).\nDana ${sourceMethod == 'manual' ? "Tunai" : "Digital"} tidak bisa dialokasikan ke sana.',
                         style: TextStyle(
-                            fontSize: 13, color: Colors.orange.shade900),
+                          fontSize: 13,
+                          color: isDarkMode
+                              ? Colors.orange.shade100
+                              : Colors.orange.shade900,
+                        ),
                       ),
                     ),
                   ],
@@ -797,9 +1076,7 @@ class _AllGoalsCompletedView extends StatelessWidget {
             Text(
               'Anda memiliki sisa dana:',
               style: TextStyle(
-                color: isDarkMode
-                    ? Colors.grey.shade400
-                    : Colors.grey.shade700,
+                color: isDarkMode ? Colors.grey.shade300 : Colors.grey.shade700,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -809,7 +1086,9 @@ class _AllGoalsCompletedView extends StatelessWidget {
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color: Colors.green.shade700,
+                color: isDarkMode
+                    ? Colors.green.shade300
+                    : Colors.green.shade700,
               ),
             ),
             const SizedBox(height: 24),
@@ -828,128 +1107,271 @@ class _AllGoalsCompletedView extends StatelessWidget {
               InkWell(
                 onTap: () => onSubmit(true),
                 borderRadius: BorderRadius.circular(12),
-                child: Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDarkMode
+                        ? Colors.blue.shade900.withOpacity(0.3)
+                        : Colors.blue.shade50,
                     borderRadius: BorderRadius.circular(12),
-                  ),
-                  color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(Icons.account_balance_wallet,
-                              color: Colors.blue.shade700),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                'Simpan di Akun',
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                'Gunakan untuk goal baru nanti',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode
-                                      ? Colors.grey.shade400
-                                      : Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          color: isDarkMode
-                              ? Colors.grey.shade600
-                              : Colors.grey.shade400,
-                        ),
-                      ],
+                    border: Border.all(
+                      color: isDarkMode
+                          ? Colors.blue.shade600
+                          : Colors.blue.shade200,
+                      width: 1.5,
                     ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: isDarkMode
+                              ? Colors.blue.shade800
+                              : Colors.blue.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          Icons.account_balance_wallet,
+                          color: isDarkMode
+                              ? Colors.blue.shade200
+                              : Colors.blue.shade700,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Simpan ke Saldo Akun',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15,
+                                color: isDarkMode
+                                    ? Colors.blue.shade100
+                                    : Colors.blue.shade900,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'Gunakan untuk goal baru nanti',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDarkMode
+                                    ? Colors.blue.shade300
+                                    : Colors.blue.shade600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.arrow_forward_ios_rounded,
+                        size: 18,
+                        color: isDarkMode
+                            ? Colors.blue.shade300
+                            : Colors.blue.shade400,
+                      ),
+                    ],
                   ),
                 ),
               ),
-            if (sourceMethod != 'manual')
-               const SizedBox(height: 12),
+            if (sourceMethod != 'manual') const SizedBox(height: 12),
 
-            // Option 2: Withdraw to E-Wallet
-              InkWell(
-                onTap: () => onSubmit(false),
-                borderRadius: BorderRadius.circular(12),
-                child: Card(
-                  elevation: 2,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  color: isDarkMode ? Colors.grey.shade800 : Colors.white,
-                  child: Padding(
-                    padding: const EdgeInsets.all(12),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: sourceMethod == 'manual' 
-                                ? Colors.green.shade50 
-                                : Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Icon(
-                             sourceMethod == 'manual'
-                                ? Icons.money_rounded // Icon for manual cash
-                                : Icons.payment,
-                             color: sourceMethod == 'manual'
-                                ? Colors.green.shade700
-                                : Colors.orange.shade700
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                sourceMethod == 'manual' 
-                                    ? 'Ambil Kembalian' 
-                                    : 'Tarik ke E-Wallet',
-                                style: const TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                sourceMethod == 'manual'
-                                    ? 'Uang tunai deposit tidak disetorkan'
-                                    : 'Transfer ke Dana, GoPay, dll',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isDarkMode
-                                      ? Colors.grey.shade400
-                                      : Colors.grey.shade600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          Icons.chevron_right,
-                          color: isDarkMode
-                              ? Colors.grey.shade600
-                              : Colors.grey.shade400,
-                        ),
-                      ],
-                    ),
+            // Option 2: Withdraw to E-Wallet / Tarik Dana
+            InkWell(
+              onTap: () => onSubmit(false),
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: isDarkMode
+                      ? (sourceMethod == 'manual'
+                            ? Colors.green.shade900.withOpacity(0.3)
+                            : Colors.orange.shade900.withOpacity(0.3))
+                      : (sourceMethod == 'manual'
+                            ? Colors.green.shade50
+                            : Colors.orange.shade50),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDarkMode
+                        ? (sourceMethod == 'manual'
+                              ? Colors.green.shade600
+                              : Colors.orange.shade600)
+                        : (sourceMethod == 'manual'
+                              ? Colors.green.shade200
+                              : Colors.orange.shade200),
+                    width: 1.5,
                   ),
                 ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: isDarkMode
+                            ? (sourceMethod == 'manual'
+                                  ? Colors.green.shade800
+                                  : Colors.orange.shade800)
+                            : (sourceMethod == 'manual'
+                                  ? Colors.green.shade100
+                                  : Colors.orange.shade100),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        sourceMethod == 'manual'
+                            ? Icons.money_rounded
+                            : Icons.payments_outlined,
+                        color: isDarkMode
+                            ? (sourceMethod == 'manual'
+                                  ? Colors.green.shade200
+                                  : Colors.orange.shade200)
+                            : (sourceMethod == 'manual'
+                                  ? Colors.green.shade700
+                                  : Colors.orange.shade700),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            sourceMethod == 'manual'
+                                ? 'Ambil Kembalian Tunai'
+                                : 'Tarik Dana',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                              color: isDarkMode
+                                  ? (sourceMethod == 'manual'
+                                        ? Colors.green.shade100
+                                        : Colors.orange.shade100)
+                                  : (sourceMethod == 'manual'
+                                        ? Colors.green.shade900
+                                        : Colors.orange.shade900),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            sourceMethod == 'manual'
+                                ? 'Uang tunai tidak disetorkan'
+                                : 'Transfer ke Dana, GoPay, OVO, dll',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDarkMode
+                                  ? (sourceMethod == 'manual'
+                                        ? Colors.green.shade300
+                                        : Colors.orange.shade300)
+                                  : (sourceMethod == 'manual'
+                                        ? Colors.green.shade600
+                                        : Colors.orange.shade600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Icon(
+                      Icons.arrow_forward_ios_rounded,
+                      size: 18,
+                      color: isDarkMode
+                          ? (sourceMethod == 'manual'
+                                ? Colors.green.shade300
+                                : Colors.orange.shade300)
+                          : (sourceMethod == 'manual'
+                                ? Colors.green.shade400
+                                : Colors.orange.shade400),
+                    ),
+                  ],
+                ),
               ),
+            ),
             const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact action button for quick actions
+class _QuickActionButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final MaterialColor color;
+  final bool isDarkMode;
+  final VoidCallback onTap;
+
+  const _QuickActionButton({
+    Key? key,
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.isDarkMode,
+    required this.onTap,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: isDarkMode ? color.shade900.withOpacity(0.3) : color.shade50,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isDarkMode ? color.shade600 : color.shade200,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isDarkMode ? color.shade800 : color.shade100,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(
+                icon,
+                size: 18,
+                color: isDarkMode ? color.shade200 : color.shade700,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: isDarkMode ? color.shade100 : color.shade900,
+                    ),
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isDarkMode ? color.shade300 : color.shade600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 14,
+              color: isDarkMode ? color.shade400 : color.shade400,
+            ),
           ],
         ),
       ),

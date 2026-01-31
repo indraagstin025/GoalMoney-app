@@ -4,6 +4,7 @@ import 'providers/auth_provider.dart';
 import 'providers/goal_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'providers/theme_provider.dart';
+import 'providers/badge_provider.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/splash_screen.dart';
@@ -16,7 +17,7 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -24,6 +25,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => GoalProvider()),
         ChangeNotifierProvider(create: (_) => TransactionProvider()),
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => BadgeProvider()),
       ],
       child: const MyApp(),
     ),
@@ -59,4 +61,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

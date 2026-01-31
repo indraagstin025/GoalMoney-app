@@ -68,4 +68,11 @@ class TransactionProvider with ChangeNotifier {
       );
     }
   }
+
+  /// Clear all data (on logout)
+  void clear() {
+    _transactions = [];
+    _isLoading = false;
+    notifyListeners();
+  }
 }

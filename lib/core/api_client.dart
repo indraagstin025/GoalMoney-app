@@ -17,9 +17,14 @@ class ApiClient {
       InterceptorsWrapper(
         onRequest: (options, handler) async {
           final prefs = await SharedPreferences.getInstance();
-          final token = prefs.getString('token'); 
+          final token = prefs.getString('token');
           if (token != null) {
             options.headers['Authorization'] = 'Bearer $token';
+            print(
+              '[ApiClient] Request: ${options.path}, Token: ${token.substring(0, 5)}...',
+            );
+          } else {
+            print('[ApiClient] Request: ${options.path}, Token: NULL');
           }
           return handler.next(options);
         },

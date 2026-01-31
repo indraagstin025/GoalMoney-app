@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
-import '../../providers/goal_provider.dart';
+import '../../providers/badge_provider.dart';
+import '../../widgets/badge_celebration_dialog.dart';
 import '../../core/photo_storage_service.dart';
+import '../../providers/goal_provider.dart';
 
 class AddGoalScreen extends StatefulWidget {
   const AddGoalScreen({super.key});
@@ -20,11 +22,6 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
   String _selectedType = 'digital'; // Default type
   bool _isLoading = false;
   String? _goalPhotoPath;
-  final _currencyFormat = NumberFormat.currency(
-    locale: 'id_ID',
-    symbol: 'Rp ',
-    decimalDigits: 0,
-  );
 
   Future<void> _pickGoalPhoto() async {
     try {
@@ -74,20 +71,36 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       if (_goalPhotoPath != null && newGoalId != null) {
         await PhotoStorageService.moveGoalPhoto(0, newGoalId);
         // Note: createGoal inside GoalProvider already triggers a fetchGoals(),
-        // but since we just moved the photo, we might need to refresh specifically 
-        // ensuring the photo is picked up. 
+        // but since we just moved the photo, we might need to refresh specifically
+        // ensuring the photo is picked up.
         // However, PhotoStorageService.getGoalPhotoPath checks the file system directly usually.
         // Let's rely on the previous logic but optimize:
         // GoalProvider creates the goal -> fetchGoals is called.
         // Then we move the photo.
         // We might need to update the Goal object in provider with the new photo path if it was null.
-        
-        // Simpler approach: Just trigger a swift refresh or rely on hot reload for now, 
+
+        // Simpler approach: Just trigger a swift refresh or rely on hot reload for now,
         // but for production, triggering fetchGoals again is safe enough given our parallel optimization.
         // OR better: Update the local goal instance if possible.
         // For now, keeping the fetch to ensure consistency, but it shouldn't be blocking the UI too much.
         await goalProvider.fetchGoals();
       }
+
+      // --- NEW: Trigger Badge Check ---
+      try {
+        final badgeProvider = Provider.of<BadgeProvider>(
+          context,
+          listen: false,
+        );
+        badgeProvider.checkAndAwardBadges().then((newBadges) {
+          if (newBadges.isNotEmpty && mounted) {
+            showBadgeCelebration(context, newBadges);
+          }
+        });
+      } catch (e) {
+        print('[AddGoalScreen] Badge check error: $e');
+      }
+      // -------------------------------
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -102,8 +115,8 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Gagal membuat goal'),
+          SnackBar(
+            content: Text('Gagal membuat goal: ${e.toString()}'),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -193,38 +206,18 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       const SizedBox(height: 20),
 
                       // Target Amount Field
-                      _InputField(
+                      CurrencyInputField(
                         label: 'Target Jumlah',
                         controller: _targetCtrl,
-                        hint: '0',
-                        icon: Icons.attach_money_rounded,
                         isDarkMode: isDarkMode,
-                        prefixText: 'Rp ',
-                        keyboardType: TextInputType.number,
-                        onChanged: (value) {
-                          if (value.isEmpty) return;
-                          final numericValue =
-                              value.replaceAll(RegExp('[^0-9]'), '');
-                          if (numericValue.isNotEmpty) {
-                            final formatted = _currencyFormat.format(
-                              int.parse(numericValue),
-                            );
-                            final cleanText =
-                                formatted.replaceAll('Rp ', '').trim();
-                            _targetCtrl.value = TextEditingValue(
-                              text: cleanText,
-                              selection: TextSelection.fromPosition(
-                                TextPosition(offset: cleanText.length),
-                              ),
-                            );
-                          }
-                        },
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Target jumlah tidak boleh kosong';
                           }
-                          final numericValue =
-                              value.replaceAll(RegExp('[^0-9]'), '');
+                          final numericValue = value.replaceAll(
+                            RegExp('[^0-9]'),
+                            '',
+                          );
                           if (numericValue.isEmpty ||
                               int.parse(numericValue) <= 0) {
                             return 'Target harus lebih dari 0';
@@ -243,7 +236,9 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Theme.of(context).textTheme.bodyLarge?.color,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodyLarge?.color,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -254,14 +249,19 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                                   ? Colors.grey.shade800.withOpacity(0.3)
                                   : Colors.grey.shade50,
                               border: Border.all(
-                                color: isDarkMode ? Colors.grey.shade700 : Colors.grey.shade300,
+                                color: isDarkMode
+                                    ? Colors.grey.shade700
+                                    : Colors.grey.shade300,
                               ),
                             ),
                             child: DropdownButtonFormField<String>(
                               value: _selectedType,
                               isExpanded: true, // Fix overflow
                               decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                contentPadding: EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                  vertical: 12,
+                                ),
                                 border: InputBorder.none,
                                 prefixIcon: Icon(Icons.category_rounded),
                               ),
@@ -340,8 +340,9 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: Colors.green.shade200
-                                          .withOpacity(0.5),
+                                      color: Colors.green.shade200.withOpacity(
+                                        0.5,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -456,10 +457,7 @@ class _GoalPhotoPicker extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           gradient: !hasPhoto
               ? LinearGradient(
-                  colors: [
-                    Colors.green.shade700,
-                    Colors.green.shade500,
-                  ],
+                  colors: [Colors.green.shade700, Colors.green.shade500],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 )
@@ -589,10 +587,7 @@ class _InputField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hint,
             prefixText: prefixText,
-            prefixIcon: Icon(
-              icon,
-              color: Colors.lightGreen.shade700,
-            ),
+            prefixIcon: Icon(icon, color: Colors.lightGreen.shade700),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: BorderSide(
@@ -622,6 +617,145 @@ class _InputField extends StatelessWidget {
           textCapitalization: textCapitalization,
           onChanged: onChanged,
           validator: validator,
+        ),
+      ],
+    );
+  }
+}
+
+/// Currency Input Field with proper placeholder behavior
+/// - Unfocused + empty: Shows "Contoh: Rp 1.000.000"
+/// - Focused: Shows "Rp " prefix with formatted value
+class CurrencyInputField extends StatefulWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool isDarkMode;
+  final String? Function(String?)? validator;
+
+  const CurrencyInputField({
+    Key? key,
+    required this.label,
+    required this.controller,
+    required this.isDarkMode,
+    this.validator,
+  }) : super(key: key);
+
+  @override
+  State<CurrencyInputField> createState() => _CurrencyInputFieldState();
+}
+
+class _CurrencyInputFieldState extends State<CurrencyInputField> {
+  bool _isFocused = false;
+  final FocusNode _focusNode = FocusNode();
+  final _currencyFormat = NumberFormat.currency(
+    locale: 'id_ID',
+    symbol: 'Rp ',
+    decimalDigits: 0,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode.addListener(_handleFocusChange);
+  }
+
+  @override
+  void dispose() {
+    _focusNode.removeListener(_handleFocusChange);
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _handleFocusChange() {
+    setState(() {
+      _isFocused = _focusNode.hasFocus;
+    });
+  }
+
+  void _formatCurrency(String value) {
+    if (value.isEmpty) return;
+
+    final numericValue = value.replaceAll(RegExp('[^0-9]'), '');
+    if (numericValue.isNotEmpty) {
+      final formatted = _currencyFormat.format(int.parse(numericValue));
+      final cleanText = formatted.replaceAll('Rp ', '').trim();
+      widget.controller.value = TextEditingValue(
+        text: cleanText,
+        selection: TextSelection.fromPosition(
+          TextPosition(offset: cleanText.length),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasValue = widget.controller.text.isNotEmpty;
+    final showPrefix = _isFocused || hasValue;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: Theme.of(context).textTheme.bodyLarge?.color,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: widget.controller,
+          focusNode: _focusNode,
+          decoration: InputDecoration(
+            hintText: showPrefix ? '' : 'Contoh: Rp 1.000.000',
+            hintStyle: TextStyle(
+              color: widget.isDarkMode
+                  ? Colors.grey.shade500
+                  : Colors.grey.shade400,
+              fontStyle: FontStyle.italic,
+            ),
+            prefixText: showPrefix ? 'Rp ' : null,
+            prefixStyle: TextStyle(
+              color: Theme.of(context).textTheme.bodyLarge?.color,
+              fontWeight: FontWeight.w500,
+            ),
+            prefixIcon: Icon(
+              Icons.attach_money_rounded,
+              color: _isFocused ? Colors.lightGreen.shade700 : Colors.grey,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: widget.isDarkMode
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade300,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: widget.isDarkMode
+                    ? Colors.grey.shade700
+                    : Colors.grey.shade300,
+              ),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: Colors.lightGreen.shade700,
+                width: 2,
+              ),
+            ),
+            filled: true,
+            fillColor: widget.isDarkMode
+                ? Colors.grey.shade800.withOpacity(0.3)
+                : Colors.grey.shade50,
+          ),
+          keyboardType: TextInputType.number,
+          onChanged: _formatCurrency,
+          validator: widget.validator,
         ),
       ],
     );

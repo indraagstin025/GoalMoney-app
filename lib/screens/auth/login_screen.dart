@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
+import '../../providers/goal_provider.dart';
+import '../../providers/badge_provider.dart';
+import '../../providers/transaction_provider.dart';
 import '../../core/validators.dart';
+import '../dashboard/dashboard_screen.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,6 +24,19 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
+  void initState() {
+    super.initState();
+    // Safety clear to ensure no leftover data from previous session
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<GoalProvider>().clear();
+        context.read<BadgeProvider>().clear();
+        context.read<TransactionProvider>().clear();
+      }
+    });
+  }
+
+  @override
   void dispose() {
     _emailCtrl.dispose();
     _passCtrl.dispose();
@@ -35,11 +52,18 @@ class _LoginScreenState extends State<LoginScreen> {
         context,
         listen: false,
       ).login(_emailCtrl.text, _passCtrl.text);
+
+      if (mounted) {
+        // Safety: Manual navigation to Dashboard after success,
+        // useful if LoginScreen was pushed on top of another screen.
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const DashboardScreen()),
+          (route) => false,
+        );
+      }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Login gagal: ${e.toString()}'),
             backgroundColor: Colors.red,
@@ -173,7 +197,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               color: Colors.grey,
                             ),
                             onPressed: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
                             },
                           ),
                           border: OutlineInputBorder(
@@ -245,8 +271,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.green.shade200.withOpacity(0.5),
+                                      color: Colors.green.shade200.withOpacity(
+                                        0.5,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -295,7 +322,9 @@ class _LoginScreenState extends State<LoginScreen> {
                               );
                             },
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                             ),
                             child: Text(
                               'Daftar di sini',
@@ -364,10 +393,7 @@ class _LoginScreenState extends State<LoginScreen> {
               color: Colors.grey,
             ),
             onPressed: () {
-              Provider.of<ThemeProvider>(
-                context,
-                listen: false,
-              ).toggleTheme();
+              Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
             },
           ),
         ],

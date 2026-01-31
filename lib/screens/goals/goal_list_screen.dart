@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'dart:io';
-import 'package:intl/intl.dart';
 
 import '../../providers/goal_provider.dart';
+import '../../widgets/goal_card.dart';
 import 'add_goal_screen.dart';
-import 'goal_detail_screen.dart';
-import 'edit_goal_screen.dart';
-import 'deposit_screen.dart';
 
 class GoalListScreen extends StatefulWidget {
   const GoalListScreen({Key? key}) : super(key: key);
@@ -16,13 +12,23 @@ class GoalListScreen extends StatefulWidget {
   State<GoalListScreen> createState() => _GoalListScreenState();
 }
 
-class _GoalListScreenState extends State<GoalListScreen> {
+class _GoalListScreenState extends State<GoalListScreen>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     Future.microtask(() {
       Provider.of<GoalProvider>(context, listen: false).fetchGoals();
     });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   @override
@@ -35,36 +41,78 @@ class _GoalListScreenState extends State<GoalListScreen> {
         child: Column(
           children: [
             // Custom Header
-            const _CustomHeader(),
+            _CustomHeader(),
 
-            // Main Content
+            // Tab Bar
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+              decoration: BoxDecoration(
+                color: isDarkMode ? Colors.grey.shade800 : Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade600, Colors.green.shade400],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelColor: Colors.white,
+                unselectedLabelColor: isDarkMode
+                    ? Colors.grey.shade400
+                    : Colors.grey.shade600,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                ),
+                tabs: const [
+                  Tab(
+                    icon: Icon(Icons.monetization_on_rounded, size: 20),
+                    text: 'Cash Goals',
+                  ),
+                  Tab(
+                    icon: Icon(Icons.account_balance_wallet_rounded, size: 20),
+                    text: 'E-Wallet Goals',
+                  ),
+                ],
+              ),
+            ),
+
+            // Tab Content
             Expanded(
               child: Consumer<GoalProvider>(
                 builder: (context, goalProvider, child) {
-                   if (goalProvider.isLoading) {
-                     return const Center(child: CircularProgressIndicator());
-                   }
-                   
-                   if (goalProvider.goals.isEmpty) {
-                     return _EmptyState(isDarkMode: isDarkMode);
-                   }
+                  if (goalProvider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
 
-                   return RefreshIndicator(
-                    onRefresh: () async {
-                      await goalProvider.fetchGoals();
-                    },
-                    child: ListView.builder(
-                      padding: const EdgeInsets.all(20),
-                      itemCount: goalProvider.goals.length,
-                      itemBuilder: (context, index) {
-                        final goal = goalProvider.goals[index];
-                        return GoalCard(
-                          key: ValueKey(goal.id),
-                          goal: goal,
-                          isDarkMode: isDarkMode,
-                        );
-                      },
-                    ),
+                  final cashGoals = goalProvider.goals.where((g) {
+                    final goalType = g.type ?? 'digital';
+                    return goalType == 'cash';
+                  }).toList();
+
+                  final digitalGoals = goalProvider.goals.where((g) {
+                    final goalType = g.type ?? 'digital';
+                    return goalType == 'digital';
+                  }).toList();
+
+                  return TabBarView(
+                    controller: _tabController,
+                    children: [
+                      // Cash Goals Tab
+                      _buildGoalsList(context, cashGoals, isDarkMode, 'cash'),
+
+                      // Digital Goals Tab
+                      _buildGoalsList(
+                        context,
+                        digitalGoals,
+                        isDarkMode,
+                        'digital',
+                      ),
+                    ],
                   );
                 },
               ),
@@ -74,9 +122,9 @@ class _GoalListScreenState extends State<GoalListScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const AddGoalScreen()),
-          );
+          Navigator.of(
+            context,
+          ).push(MaterialPageRoute(builder: (_) => const AddGoalScreen()));
         },
         icon: const Icon(Icons.add_rounded),
         label: const Text(
@@ -84,6 +132,35 @@ class _GoalListScreenState extends State<GoalListScreen> {
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
         backgroundColor: Colors.green.shade700,
+      ),
+    );
+  }
+
+  Widget _buildGoalsList(
+    BuildContext context,
+    List<dynamic> goals,
+    bool isDarkMode,
+    String type,
+  ) {
+    if (goals.isEmpty) {
+      return _EmptyState(isDarkMode: isDarkMode, type: type);
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Provider.of<GoalProvider>(context, listen: false).fetchGoals();
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+        itemCount: goals.length,
+        itemBuilder: (context, index) {
+          final goal = goals[index];
+          return GoalCard(
+            key: ValueKey(goal.id),
+            goal: goal,
+            isDarkMode: isDarkMode,
+          );
+        },
       ),
     );
   }
@@ -145,11 +222,22 @@ class _CustomHeader extends StatelessWidget {
 
 class _EmptyState extends StatelessWidget {
   final bool isDarkMode;
+  final String type;
 
-  const _EmptyState({Key? key, required this.isDarkMode}) : super(key: key);
+  const _EmptyState({Key? key, required this.isDarkMode, required this.type})
+    : super(key: key);
 
   @override
   Widget build(BuildContext context) {
+    final isCash = type == 'cash';
+    final icon = isCash
+        ? Icons.money_rounded
+        : Icons.account_balance_wallet_rounded;
+    final title = isCash ? 'Belum Ada Goal Cash' : 'Belum Ada Goal E-Wallet';
+    final subtitle = isCash
+        ? 'Mulai menabung uang cash dengan\nmenambahkan goal cash pertama Anda'
+        : 'Mulai menabung digital dengan\nmenambahkan goal e-wallet pertama Anda';
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -167,15 +255,11 @@ class _EmptyState extends StatelessWidget {
               ),
               shape: BoxShape.circle,
             ),
-            child: Icon(
-              Icons.flag_rounded,
-              size: 80,
-              color: Colors.green.shade300,
-            ),
+            child: Icon(icon, size: 80, color: Colors.green.shade300),
           ),
           const SizedBox(height: 24),
           Text(
-            'Belum Ada Goal',
+            title,
             style: TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -184,7 +268,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Mulai perjalanan keuangan Anda sekarang\ndengan menambahkan goal pertama',
+            subtitle,
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
@@ -194,9 +278,9 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 32),
           ElevatedButton.icon(
             onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AddGoalScreen()),
-              );
+              Navigator.of(
+                context,
+              ).push(MaterialPageRoute(builder: (_) => const AddGoalScreen()));
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade700,
@@ -206,519 +290,13 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             icon: const Icon(Icons.add_rounded, color: Colors.white),
-            label: const Text(
-              'Tambah Goal Pertama',
-              style: TextStyle(
+            label: Text(
+              'Tambah Goal ${isCash ? "Cash" : "E-Wallet"}',
+              style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class GoalCard extends StatefulWidget {
-  final dynamic goal;
-  final bool isDarkMode;
-
-  const GoalCard({
-    Key? key,
-    required this.goal,
-    required this.isDarkMode,
-  }) : super(key: key);
-
-  @override
-  State<GoalCard> createState() => _GoalCardState();
-}
-
-class _GoalCardState extends State<GoalCard> {
-  File? _goalImage;
-  bool _imageExists = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkImage();
-  }
-
-  @override
-  void didUpdateWidget(GoalCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.goal.photoPath != widget.goal.photoPath) {
-      _checkImage();
-    }
-  }
-
-  void _checkImage() {
-    if (widget.goal.photoPath != null) {
-      final file = File(widget.goal.photoPath!);
-      // Checking existence synchronously here is still "okay" if done once per update
-      // but moving to async if file I/O is heavy is better. 
-      // For local files on mobile, sync check is usually fast enough if not done in build loop.
-      // However, to be strictly "optimized/lighter", we can do it:
-      final exists = file.existsSync();
-      setState(() {
-        _imageExists = exists;
-        _goalImage = exists ? file : null;
-      });
-    } else {
-      setState(() {
-        _imageExists = false;
-        _goalImage = null;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currency = NumberFormat.currency(
-      locale: 'id_ID',
-      symbol: 'Rp ',
-      decimalDigits: 0,
-    );
-    
-    // Calculate progress (clamped)
-    final progress = (widget.goal.progress / 100).clamp(0.0, 1.0);
-    final isCompleted = progress >= 1.0;
-    
-    // We access Provider via context.read/select locally inside handlers usually, 
-    // but for the menu actions we need the provider instance.
-    // It's better to pass actions or look up provider in the callback.
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      decoration: BoxDecoration(
-        color: widget.isDarkMode ? Colors.grey.shade800 : Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: isCompleted
-              ? Colors.green.shade300
-              : (widget.isDarkMode ? Colors.grey.shade700 : Colors.grey.shade100),
-          width: isCompleted ? 2 : 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: widget.isDarkMode
-                ? Colors.black.withOpacity(0.3)
-                : Colors.grey.shade200.withOpacity(0.5),
-            blurRadius: 15,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => GoalDetailScreen(goal: widget.goal)),
-            );
-          },
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header Row
-                Row(
-                  children: [
-                    // Goal Image/Icon
-                    Container(
-                      width: 64,
-                      height: 64,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(16),
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.green.shade700,
-                            Colors.green.shade500,
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.green.shade200.withOpacity(0.4),
-                            blurRadius: 8,
-                            offset: const Offset(0, 4),
-                          ),
-                        ],
-                        image: _imageExists && _goalImage != null
-                            ? DecorationImage(
-                                image: FileImage(_goalImage!),
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                      child: !_imageExists
-                          ? const Icon(
-                              Icons.star_rounded,
-                              color: Colors.white,
-                              size: 32,
-                            )
-                          : null,
-                    ),
-                    const SizedBox(width: 16),
-
-                    // Goal Name & Status
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  widget.goal.name,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Theme.of(context)
-                                        .textTheme
-                                        .titleLarge
-                                        ?.color,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (isCompleted)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        Colors.green.shade600,
-                                        Colors.green.shade400,
-                                      ],
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.check_circle_rounded,
-                                        color: Colors.white,
-                                        size: 14,
-                                      ),
-                                      SizedBox(width: 4),
-                                      Text(
-                                        'Tercapai',
-                                        style: TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            '${widget.goal.progress.toStringAsFixed(1)}% dari target',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: widget.isDarkMode
-                                  ? Colors.grey.shade400
-                                  : Colors.grey.shade600,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // Actions Menu
-                    PopupMenuButton(
-                      icon: Icon(
-                        Icons.more_vert_rounded,
-                        color: widget.isDarkMode
-                            ? Colors.grey.shade500
-                            : Colors.grey.shade400,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'deposit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.add_circle_outline,
-                                  color: Colors.green, size: 22),
-                              SizedBox(width: 12),
-                              Text(
-                                'Deposit',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'edit',
-                          child: Row(
-                            children: [
-                              Icon(Icons.edit_outlined,
-                                  color: Colors.blue, size: 22),
-                              SizedBox(width: 12),
-                              Text(
-                                'Edit',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'delete',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline,
-                                  color: Colors.red, size: 22),
-                              SizedBox(width: 12),
-                              Text(
-                                'Hapus',
-                                style: TextStyle(fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                      onSelected: (value) {
-                        if (value == 'deposit') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => DepositScreen(
-                                goalId: widget.goal.id,
-                                goalName: widget.goal.name,
-                              ),
-                            ),
-                          );
-                        } else if (value == 'edit') {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => EditGoalScreen(goal: widget.goal),
-                            ),
-                          );
-                        } else if (value == 'delete') {
-                           _confirmDelete(context, widget.goal);
-                        }
-                      },
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Amount Info
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: widget.isDarkMode
-                        ? Colors.grey.shade900.withOpacity(0.5)
-                        : Colors.green.shade50.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: widget.isDarkMode
-                          ? Colors.grey.shade700
-                          : Colors.green.shade100,
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Current Amount
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Terkumpul',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: widget.isDarkMode
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              currency.format(widget.goal.currentAmount),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.green.shade700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // Divider
-                      Container(
-                        height: 40,
-                        width: 1,
-                        color: widget.isDarkMode
-                            ? Colors.grey.shade700
-                            : Colors.grey.shade300,
-                      ),
-
-                      // Target Amount
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              'Target',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: widget.isDarkMode
-                                    ? Colors.grey.shade400
-                                    : Colors.grey.shade600,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              currency.format(widget.goal.targetAmount),
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .bodyLarge
-                                    ?.color,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 16),
-
-                // Progress Bar
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Progress',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: widget.isDarkMode
-                                ? Colors.grey.shade400
-                                : Colors.grey.shade600,
-                          ),
-                        ),
-                        Text(
-                          '${widget.goal.progress.toStringAsFixed(1)}%',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.green.shade700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    Container(
-                      height: 10,
-                      decoration: BoxDecoration(
-                        color: widget.isDarkMode
-                            ? Colors.grey.shade800
-                            : Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: Stack(
-                          children: [
-                            FractionallySizedBox(
-                              widthFactor: progress,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.green.shade600,
-                                      Colors.green.shade400,
-                                    ],
-                                    begin: Alignment.centerLeft,
-                                    end: Alignment.centerRight,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.green.shade300
-                                          .withOpacity(0.5),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _confirmDelete(BuildContext context, dynamic goal) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
-        title: const Text('Hapus Goal?'),
-        content: Text(
-          'Apakah Anda yakin ingin menghapus goal "${goal.name}" beserta semua transaksinya?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Batal'),
-          ),
-          TextButton(
-            onPressed: () {
-              // Get provider before popping if needed, or maintain context
-              Provider.of<GoalProvider>(context, listen: false).deleteGoal(goal.id);
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Goal berhasil dihapus'),
-                  backgroundColor: Colors.green,
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
-            },
-            child: const Text(
-              'Hapus',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
             ),
           ),
         ],
