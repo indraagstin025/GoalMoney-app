@@ -700,6 +700,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     applicationName: 'GoalMoney',
                     applicationVersion: '1.0.0',
                     applicationLegalese: '© 2024 GoalMoney',
+                    children: [
+                      const SizedBox(height: 20),
+                      const Text(
+                        'Author:',
+                        style: TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      const Text('Indra Agustin - 714230051'),
+                      const Text('Efendi Sugiantoro - 714230018'),
+                    ],
                   );
                 },
               ),
