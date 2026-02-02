@@ -1,5 +1,6 @@
+/// Kumpulan fungsi validasi untuk berbagai input form dalam aplikasi.
 class Validators {
-  // Email validation
+  /// Validasi format alamat email.
   static String? validateEmail(String? value) {
     if (value == null || value.isEmpty) {
       return 'Email wajib diisi';
@@ -11,7 +12,7 @@ class Validators {
     return null;
   }
 
-  // Password validation
+  /// Validasi panjang password (minimal 6 karakter).
   static String? validatePassword(String? value) {
     if (value == null || value.isEmpty) {
       return 'Password wajib diisi';
@@ -22,7 +23,7 @@ class Validators {
     return null;
   }
 
-  // Confirm password validation
+  /// Validasi konfirmasi password agar sama dengan password utama.
   static String? validateConfirmPassword(String? value, String password) {
     if (value == null || value.isEmpty) {
       return 'Konfirmasi password wajib diisi';
@@ -33,7 +34,7 @@ class Validators {
     return null;
   }
 
-  // Name validation
+  /// Validasi nama pengguna (minimal 3 karakter).
   static String? validateName(String? value) {
     if (value == null || value.isEmpty) {
       return 'Nama wajib diisi';
@@ -44,7 +45,7 @@ class Validators {
     return null;
   }
 
-  // Goal name validation
+  /// Validasi nama goal agar tidak kosong.
   static String? validateGoalName(String? value) {
     if (value == null || value.isEmpty) {
       return 'Nama goal wajib diisi';
@@ -52,11 +53,12 @@ class Validators {
     return null;
   }
 
-  // Amount validation (for target_amount & transaction amount)
+  /// Validasi jumlah uang (harus angka positif dan lebih dari 0).
   static String? validateAmount(String? value) {
     if (value == null || value.isEmpty) {
       return 'Jumlah wajib diisi';
     }
+    // Hapus pemisah ribuan sebelum diubah menjadi angka
     final amount = double.tryParse(
       value.replaceAll(',', '').replaceAll('.', ''),
     );
@@ -69,7 +71,7 @@ class Validators {
     return null;
   }
 
-  // Required field validation
+  /// Validasi umum untuk kolom yang wajib diisi.
   static String? validateRequired(String? value, String fieldName) {
     if (value == null || value.isEmpty) {
       return '$fieldName wajib diisi';

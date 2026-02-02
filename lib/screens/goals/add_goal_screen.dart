@@ -6,7 +6,10 @@ import '../../providers/badge_provider.dart';
 import '../../widgets/badge_celebration_dialog.dart';
 import '../../core/photo_storage_service.dart';
 import '../../providers/goal_provider.dart';
+import '../../widgets/deadline_picker_field.dart';
 
+/// Layar untuk menambahkan goal baru.
+/// Pengguna dapat memasukkan nama, target jumlah, tipe goal, deadline, deskripsi, dan foto goal.
 class AddGoalScreen extends StatefulWidget {
   const AddGoalScreen({super.key});
 
@@ -19,10 +22,14 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
   final _nameCtrl = TextEditingController();
   final _targetCtrl = TextEditingController();
   final _descCtrl = TextEditingController();
-  String _selectedType = 'digital'; // Default type
+  String _selectedType = 'digital'; // Tipe default
   bool _isLoading = false;
   String? _goalPhotoPath;
+  DateTime? _selectedDeadline;
+  final _dateFormat = DateFormat('yyyy-MM-dd');
+  final _displayDateFormat = DateFormat('dd MMM yyyy');
 
+  /// Memilih foto goal dari galeri atau kamera.
   Future<void> _pickGoalPhoto() async {
     try {
       final photoPath = await PhotoStorageService.pickAndSaveGoalPhoto(0);
@@ -49,44 +56,68 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
     }
   }
 
+  /// Memilih tanggal deadline menggunakan DatePicker.
+  Future<void> _selectDeadline() async {
+    final now = DateTime.now();
+    // Default deadline 30 hari dari sekarang jika belum dipilih
+    final initialDate = _selectedDeadline ?? now.add(const Duration(days: 30));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365 * 10)), // Maksimal 10 tahun
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.green,
+              primary: Colors.green.shade700,
+              brightness: Theme.of(context).brightness,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _selectedDeadline) {
+      setState(() => _selectedDeadline = picked);
+    }
+  }
+
+  /// Menangani proses submit form tambah goal.
+  /// Melakukan validasi input, pemanggilan API, dan pengecekan badge.
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
     try {
+      // Parse target amount dari format currency string ke double
       final target = double.parse(
         _targetCtrl.text.replaceAll(RegExp('[^0-9]'), ''),
       );
       final goalProvider = Provider.of<GoalProvider>(context, listen: false);
 
-      // Create goal and get the new goal ID
+      // Buat goal baru dan dapatkan ID goal baru
       final newGoalId = await goalProvider.createGoal(
         name: _nameCtrl.text,
         targetAmount: target,
+        deadline: _selectedDeadline != null
+            ? _dateFormat.format(_selectedDeadline!)
+            : null,
         description: _descCtrl.text.isNotEmpty ? _descCtrl.text : null,
         type: _selectedType,
       );
 
-      // After goal is created, move the photo from goal_0 to the new goal ID
+      // Setelah goal dibuat, pindahkan foto dari temp (ID 0) ke ID goal baru
       if (_goalPhotoPath != null && newGoalId != null) {
         await PhotoStorageService.moveGoalPhoto(0, newGoalId);
-        // Note: createGoal inside GoalProvider already triggers a fetchGoals(),
-        // but since we just moved the photo, we might need to refresh specifically
-        // ensuring the photo is picked up.
-        // However, PhotoStorageService.getGoalPhotoPath checks the file system directly usually.
-        // Let's rely on the previous logic but optimize:
-        // GoalProvider creates the goal -> fetchGoals is called.
-        // Then we move the photo.
-        // We might need to update the Goal object in provider with the new photo path if it was null.
-
-        // Simpler approach: Just trigger a swift refresh or rely on hot reload for now,
-        // but for production, triggering fetchGoals again is safe enough given our parallel optimization.
-        // OR better: Update the local goal instance if possible.
-        // For now, keeping the fetch to ensure consistency, but it shouldn't be blocking the UI too much.
+        // Refresh data goal untuk memastikan foto terambil.
         await goalProvider.fetchGoals();
       }
 
-      // --- NEW: Trigger Badge Check ---
+      // --- CEK BADGE BARU ---
+      // Cek apakah pembuatan goal ini memicu perolehan badge baru.
       try {
         final badgeProvider = Provider.of<BadgeProvider>(
           context,
@@ -144,10 +175,10 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header
+            // Header Kustom
             const _CustomHeader(),
 
-            // Main Content
+            // Konten Utama Form
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
@@ -158,7 +189,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                     children: [
                       const SizedBox(height: 20),
 
-                      // Title
+                      // Judul Halaman
                       Text(
                         'Buat Goal Baru 🎯',
                         style: TextStyle(
@@ -179,7 +210,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Photo Section
+                      // Bagian Foto Goal
                       Center(
                         child: _GoalPhotoPicker(
                           photoPath: _goalPhotoPath,
@@ -188,7 +219,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Goal Name Field
+                      // Input Nama Goal
                       _InputField(
                         label: 'Nama Goal',
                         controller: _nameCtrl,
@@ -205,7 +236,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Target Amount Field
+                      // Input Target Jumlah
                       CurrencyInputField(
                         label: 'Target Jumlah',
                         controller: _targetCtrl,
@@ -227,7 +258,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Goal Type Dropdown
+                      // Dropdown Tipe Goal
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -256,7 +287,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                             ),
                             child: DropdownButtonFormField<String>(
                               value: _selectedType,
-                              isExpanded: true, // Fix overflow
+                              isExpanded: true, // Fix overflow text
                               decoration: const InputDecoration(
                                 contentPadding: EdgeInsets.symmetric(
                                   horizontal: 16,
@@ -292,7 +323,17 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Description Field
+                      // Input Deadline (Optional)
+                      DeadlinePickerField(
+                        selectedDate: _selectedDeadline,
+                        displayFormat: _displayDateFormat,
+                        isDarkMode: isDarkMode,
+                        onTap: _selectDeadline,
+                        onClear: () => setState(() => _selectedDeadline = null),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Input Deskripsi (Optional)
                       _InputField(
                         label: 'Deskripsi (Opsional)',
                         controller: _descCtrl,
@@ -304,7 +345,7 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Submit Button
+                      // Tombol Submit (Buat Goal)
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -391,7 +432,7 @@ class _CustomHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GoalMoney Logo
+          // Logo GoalMoney
           Row(
             children: [
               Container(
@@ -423,7 +464,7 @@ class _CustomHeader extends StatelessWidget {
             ],
           ),
 
-          // Back Button
+          // Tombol Kembali
           IconButton(
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
             onPressed: () => Navigator.pop(context),

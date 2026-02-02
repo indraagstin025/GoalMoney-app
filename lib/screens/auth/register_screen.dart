@@ -4,6 +4,8 @@ import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/validators.dart';
 
+/// Layar Registrasi untuk pendaftaran pengguna baru.
+/// Memerlukan Nama Lengkap, Email, Password, dan Konfirmasi Password.
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
 
@@ -30,6 +32,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.dispose();
   }
 
+  /// Menangani proses submit form registrasi.
+  /// Memanggil fungsi register di AuthProvider dan memberikan feedback ke user.
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -39,14 +43,21 @@ class _RegisterScreenState extends State<RegisterScreen> {
         context,
         listen: false,
       ).register(_nameCtrl.text, _emailCtrl.text, _passCtrl.text);
+
       if (mounted) {
+        // Tampilkan snackbar sukses dan arahkan pengguna (otomatis via state AuthProvider atau manual user login).
+        // Note: Biasanya setelah register sukses, user bisa langsung login atau diarahkan ke login screen.
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Registrasi berhasil! Anda akan diarahkan ke dashboard.'),
+            content: Text(
+              'Registrasi berhasil! Anda akan diarahkan ke dashboard.',
+            ),
             backgroundColor: Colors.green,
             behavior: SnackBarBehavior.floating,
           ),
         );
+        // Karena logic register di AuthProvider seringkali langsung login,
+        // navigasi bisa ditangani oleh listener perubahan state auth atau manual.
       }
     } catch (e) {
       if (mounted) {
@@ -72,10 +83,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header like Dashboard & Login
+            // Header Kustom
             _buildCustomHeader(context, isDarkMode),
 
-            // Main Content
+            // Konten Utama Form Registrasi
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
@@ -86,7 +97,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     children: [
                       const SizedBox(height: 20),
 
-                      // Welcome Text
+                      // Teks Sambutan
                       Text(
                         'Buat Akun Baru 🚀',
                         style: TextStyle(
@@ -107,7 +118,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Name Field
+                      // Input Nama Lengkap
                       Text(
                         'Nama Lengkap',
                         style: TextStyle(
@@ -158,7 +169,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Email Field
+                      // Input Email
                       Text(
                         'Email',
                         style: TextStyle(
@@ -209,7 +220,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Password Field
+                      // Input Password
                       Text(
                         'Password',
                         style: TextStyle(
@@ -235,7 +246,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               color: Colors.grey,
                             ),
                             onPressed: () {
-                              setState(() => _obscurePassword = !_obscurePassword);
+                              setState(
+                                () => _obscurePassword = !_obscurePassword,
+                              );
                             },
                           ),
                           border: OutlineInputBorder(
@@ -271,7 +284,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Confirm Password Field
+                      // Input Konfirmasi Password
                       Text(
                         'Konfirmasi Password',
                         style: TextStyle(
@@ -298,7 +311,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             ),
                             onPressed: () {
                               setState(
-                                () => _obscureConfirmPassword = !_obscureConfirmPassword,
+                                () => _obscureConfirmPassword =
+                                    !_obscureConfirmPassword,
                               );
                             },
                           ),
@@ -331,12 +345,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               : Colors.grey.shade50,
                         ),
                         obscureText: _obscureConfirmPassword,
-                        validator: (v) =>
-                            Validators.validateConfirmPassword(v, _passCtrl.text),
+                        validator: (v) => Validators.validateConfirmPassword(
+                          v,
+                          _passCtrl.text,
+                        ),
                       ),
                       const SizedBox(height: 32),
 
-                      // Register Button
+                      // Tombol Daftar
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -372,8 +388,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                   boxShadow: [
                                     BoxShadow(
-                                      color:
-                                          Colors.green.shade200.withOpacity(0.5),
+                                      color: Colors.green.shade200.withOpacity(
+                                        0.5,
+                                      ),
                                       blurRadius: 8,
                                       offset: const Offset(0, 4),
                                     ),
@@ -401,7 +418,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Login Link
+                      // Link ke Halaman Login
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -418,7 +435,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               Navigator.of(context).pop();
                             },
                             style: TextButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 8),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                             ),
                             child: Text(
                               'Login di sini',
@@ -441,6 +460,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     );
   }
 
+  /// Membangun header kustom dengan logo aplikasi dan tombol tema.
   Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -448,7 +468,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GoalMoney Logo
+          // Logo & Nama Aplikasi
           Row(
             children: [
               Container(
@@ -480,17 +500,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ],
           ),
 
-          // Theme Toggle
+          // Tombol Ganti Tema
           IconButton(
             icon: Icon(
               isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,
               color: Colors.grey,
             ),
             onPressed: () {
-              Provider.of<ThemeProvider>(
-                context,
-                listen: false,
-              ).toggleTheme();
+              Provider.of<ThemeProvider>(context, listen: false).toggleTheme();
             },
           ),
         ],

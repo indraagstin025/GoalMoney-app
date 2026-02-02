@@ -2,10 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'dart:ui';
 
+/// Widget Kartu Ringkasan (Dashboard) yang menampilkan total tabungan dan progres keseluruhan.
+/// Menggunakan desain Glassmorphism (efek kaca) dengan gradient background.
 class SummaryCard extends StatelessWidget {
+  /// Total nominal yang sudah ditabung dari semua goal.
   final double totalSaved;
+
+  /// Persentase progres keseluruhan (0-100).
   final double overallProgress;
-  final double? availableBalance; // New field
+
+  /// Saldo aktif yang tersedia (opsional, jika ada fitur saldo mengendap).
+  final double? availableBalance;
+
+  /// Formatter untuk mata uang.
   final NumberFormat currencyFormat;
 
   const SummaryCard({
@@ -25,7 +34,7 @@ class SummaryCard extends StatelessWidget {
           // Background Gradient Base
           Container(
             width: double.infinity,
-            height: 200, // Fixed height for consistent look
+            height: 200, // Tinggi tetap agar tampilan konsisten
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
@@ -37,7 +46,7 @@ class SummaryCard extends StatelessWidget {
               ),
             ),
           ),
-          // Glass Layer
+          // Layer Efek Kaca (Glassmorphism)
           Positioned.fill(
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
@@ -102,6 +111,7 @@ class SummaryCard extends StatelessWidget {
                             ],
                           ),
                         ),
+                        // Tampilkan pill saldo aktif jika ada nilainya
                         if (availableBalance != null && availableBalance! > 0)
                           _buildBalancePill(context),
                       ],
@@ -113,7 +123,7 @@ class SummaryCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Text(
-                              'Overall Progress',
+                              'Progres Keseluruhan',
                               style: TextStyle(
                                 color: Colors.white.withOpacity(0.8),
                                 fontSize: 13,
@@ -149,7 +159,7 @@ class SummaryCard extends StatelessWidget {
               ),
             ),
           ),
-          // Decorative "Light" effect
+          // Elemen dekoratif lingkaran cahaya
           Positioned(
             top: -50,
             right: -50,
@@ -167,6 +177,7 @@ class SummaryCard extends StatelessWidget {
     );
   }
 
+  /// Membangun widget kecil (pill) untuk menampilkan saldo aktif/mengendap.
   Widget _buildBalancePill(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),

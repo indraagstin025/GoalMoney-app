@@ -2,9 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../providers/goal_provider.dart';
+import '../../models/goal_filter_state.dart';
 import '../../widgets/goal_card.dart';
+import '../../widgets/search_field.dart';
+import '../../widgets/goal_filter_sheet.dart';
 import 'add_goal_screen.dart';
 
+/// Layar daftar goal.
+/// Menampilkan semua goal yang dimiliki pengguna, dibagi menjadi tab Cash dan E-Wallet.
 class GoalListScreen extends StatefulWidget {
   const GoalListScreen({Key? key}) : super(key: key);
 
@@ -15,19 +20,33 @@ class GoalListScreen extends StatefulWidget {
 class _GoalListScreenState extends State<GoalListScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  final TextEditingController _searchController = TextEditingController();
+  GoalFilterState _filterState = GoalFilterState();
 
   @override
   void initState() {
     super.initState();
+    // Inisialisasi TabController untuk 2 tab: Cash dan E-Wallet
     _tabController = TabController(length: 2, vsync: this);
+    _searchController.addListener(_onSearchChanged);
+
+    // Fetch data goal setelah frame pertama dirender
     Future.microtask(() {
       Provider.of<GoalProvider>(context, listen: false).fetchGoals();
+    });
+  }
+
+  /// Callback saat teks pencarian berubah. Update state filter.
+  void _onSearchChanged() {
+    setState(() {
+      _filterState = _filterState.copyWith(query: _searchController.text);
     });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -40,10 +59,31 @@ class _GoalListScreenState extends State<GoalListScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header
+            // Header Kustom
             _CustomHeader(),
 
-            // Tab Bar
+            // Bar Pencarian dan Filter
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: SearchField(
+                      controller: _searchController,
+                      onChanged: (val) {},
+                      onClear: () {
+                        _searchController.clear();
+                      },
+                      isDarkMode: isDarkMode,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildFilterButton(context, isDarkMode),
+                ],
+              ),
+            ),
+
+            // Tab Bar untuk menavigasi antara Cash dan E-Wallet Goals
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
               decoration: BoxDecoration(
@@ -81,7 +121,7 @@ class _GoalListScreenState extends State<GoalListScreen>
               ),
             ),
 
-            // Tab Content
+            // Konten Tab
             Expanded(
               child: Consumer<GoalProvider>(
                 builder: (context, goalProvider, child) {
@@ -89,12 +129,16 @@ class _GoalListScreenState extends State<GoalListScreen>
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final cashGoals = goalProvider.goals.where((g) {
+                  // Terapkan filter pencarian pada list goal
+                  final filteredGoals = _applyFilters(goalProvider.goals);
+
+                  // Pisahkan goal berdasarkan tipe: cash atau digital (e-wallet)
+                  final cashGoals = filteredGoals.where((g) {
                     final goalType = g.type ?? 'digital';
                     return goalType == 'cash';
                   }).toList();
 
-                  final digitalGoals = goalProvider.goals.where((g) {
+                  final digitalGoals = filteredGoals.where((g) {
                     final goalType = g.type ?? 'digital';
                     return goalType == 'digital';
                   }).toList();
@@ -102,10 +146,10 @@ class _GoalListScreenState extends State<GoalListScreen>
                   return TabBarView(
                     controller: _tabController,
                     children: [
-                      // Cash Goals Tab
+                      // Tab Cash Goals
                       _buildGoalsList(context, cashGoals, isDarkMode, 'cash'),
 
-                      // Digital Goals Tab
+                      // Tab Digital Goals
                       _buildGoalsList(
                         context,
                         digitalGoals,
@@ -120,6 +164,7 @@ class _GoalListScreenState extends State<GoalListScreen>
           ],
         ),
       ),
+      // Tombol FAB untuk menambah goal baru
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.of(
@@ -136,6 +181,7 @@ class _GoalListScreenState extends State<GoalListScreen>
     );
   }
 
+  /// Membangun list goal. Menampilkan placeholder jika kosong.
   Widget _buildGoalsList(
     BuildContext context,
     List<dynamic> goals,
@@ -143,6 +189,19 @@ class _GoalListScreenState extends State<GoalListScreen>
     String type,
   ) {
     if (goals.isEmpty) {
+      // Tampilkan state kosong khusus jika sedang mencari/filter tapi tidak ketemu
+      if (_filterState.isActive) {
+        return _NoSearchResults(
+          isDarkMode: isDarkMode,
+          onReset: () {
+            _searchController.clear();
+            setState(() {
+              _filterState = _filterState.reset();
+            });
+          },
+        );
+      }
+      // Tampilkan state kosong default
       return _EmptyState(isDarkMode: isDarkMode, type: type);
     }
 
@@ -164,8 +223,157 @@ class _GoalListScreenState extends State<GoalListScreen>
       ),
     );
   }
+
+  /// Menerapkan filter pencarian dan periode pada list goal.
+  List<dynamic> _applyFilters(List<dynamic> goals) {
+    return goals.where((goal) {
+      // Filter Nama
+      if (_filterState.query.isNotEmpty) {
+        final name = goal.name.toString().toLowerCase();
+        final query = _filterState.query.toLowerCase();
+        if (!name.contains(query)) return false;
+      }
+
+      // Filter Periode (menggunakan tanggal pembuatan)
+      final createdAtStr = goal.createdAt?.toString();
+      if (createdAtStr != null) {
+        try {
+          final createdAt = DateTime.parse(createdAtStr);
+
+          // Filter Bulan
+          if (_filterState.month != null) {
+            if (createdAt.month != _filterState.month) return false;
+          }
+
+          // Filter Tahun
+          if (_filterState.year != null) {
+            if (createdAt.year != _filterState.year) return false;
+          }
+        } catch (_) {
+          // Jika parsing tanggal gagal, skip filter periode
+        }
+      }
+
+      return true;
+    }).toList();
+  }
+
+  /// Tombol untuk membuka sheet filter. Indikator merah muncul jika filter aktif.
+  Widget _buildFilterButton(BuildContext context, bool isDarkMode) {
+    final hasActiveFilters =
+        _filterState.month != null || _filterState.year != null;
+
+    return Stack(
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: isDarkMode ? Colors.grey.shade900 : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: isDarkMode
+                    ? Colors.black.withOpacity(0.2)
+                    : Colors.grey.shade200.withOpacity(0.5),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: IconButton(
+            icon: Icon(
+              Icons.tune_rounded,
+              color: hasActiveFilters
+                  ? Colors.green.shade700
+                  : Colors.grey.shade600,
+            ),
+            onPressed: () async {
+              final newState = await showModalBottomSheet<GoalFilterState>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (context) => GoalFilterSheet(
+                  initialState: _filterState,
+                  isDarkMode: isDarkMode,
+                ),
+              );
+
+              if (newState != null) {
+                setState(() {
+                  _filterState = newState;
+                });
+              }
+            },
+          ),
+        ),
+        if (hasActiveFilters)
+          Positioned(
+            right: 8,
+            top: 8,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: Colors.redAccent,
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
 }
 
+/// Widget tampilan saat pencarian tidak menemukan hasil.
+class _NoSearchResults extends StatelessWidget {
+  final bool isDarkMode;
+  final VoidCallback onReset;
+
+  const _NoSearchResults({
+    Key? key,
+    required this.isDarkMode,
+    required this.onReset,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.search_off_rounded, size: 80, color: Colors.grey.shade300),
+          const SizedBox(height: 16),
+          Text(
+            'Tidak Ada Hasil',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: isDarkMode ? Colors.white : Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Coba sesuaikan kata kunci atau filter Anda',
+            style: TextStyle(color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
+          TextButton(
+            onPressed: onReset,
+            child: Text(
+              'Reset Semua Filter',
+              style: TextStyle(
+                color: Colors.green.shade700,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Header kustom dengan logo dan tombol kembali.
 class _CustomHeader extends StatelessWidget {
   const _CustomHeader({Key? key}) : super(key: key);
 
@@ -177,7 +385,7 @@ class _CustomHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GoalMoney Logo
+          // Logo GoalMoney
           Row(
             children: [
               Container(
@@ -209,7 +417,7 @@ class _CustomHeader extends StatelessWidget {
             ],
           ),
 
-          // Back Button
+          // Tombol Kembali
           IconButton(
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
             onPressed: () => Navigator.pop(context),
@@ -220,6 +428,7 @@ class _CustomHeader extends StatelessWidget {
   }
 }
 
+/// Widget state kosong saat pengguna belum memiliki goal.
 class _EmptyState extends StatelessWidget {
   final bool isDarkMode;
   final String type;

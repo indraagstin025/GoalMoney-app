@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../providers/goal_provider.dart';
 
+/// Widget yang menampilkan daftar riwayat penarikan dana (Withdrawal).
+/// Mengambil data dari `GoalProvider` dan menampilkannya dalam bentuk list kartu.
 class WithdrawalHistoryList extends StatelessWidget {
   final bool isDarkMode;
 
@@ -11,6 +13,7 @@ class WithdrawalHistoryList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Formatter mata uang untuk format Rupiah Indonesia.
     final currencyFormat = NumberFormat.currency(
       locale: 'id_ID',
       symbol: 'Rp ',
@@ -18,11 +21,13 @@ class WithdrawalHistoryList extends StatelessWidget {
     );
 
     return FutureBuilder(
+      // Mengambil riwayat penarikan saat pertama kali dimuat.
       future: Provider.of<GoalProvider>(
         context,
         listen: false,
       ).fetchWithdrawalHistory(),
       builder: (context, snapshot) {
+        // Tampilkan indikator loading saat data sedang diambil.
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator());
         }
@@ -31,6 +36,7 @@ class WithdrawalHistoryList extends StatelessWidget {
           builder: (context, provider, child) {
             final withdrawals = provider.withdrawals;
 
+            // Tampilan jika belum ada data riwayat penarikan.
             if (withdrawals.isEmpty) {
               return Center(
                 child: Column(
@@ -69,6 +75,7 @@ class WithdrawalHistoryList extends StatelessWidget {
               );
             }
 
+            // Tampilkan daftar transaksi penarikan.
             return ListView.separated(
               padding: const EdgeInsets.all(20),
               itemCount: withdrawals.length,
@@ -77,6 +84,8 @@ class WithdrawalHistoryList extends StatelessWidget {
                 final item = withdrawals[index];
                 Color statusColor;
                 IconData statusIcon;
+
+                // Tentukan warna dan ikon berdasarkan status penarikan.
                 switch (item.status) {
                   case 'approved':
                     statusColor = Colors.green;
@@ -86,7 +95,7 @@ class WithdrawalHistoryList extends StatelessWidget {
                     statusColor = Colors.red;
                     statusIcon = Icons.cancel;
                     break;
-                  default:
+                  default: // pending
                     statusColor = Colors.orange;
                     statusIcon = Icons.access_time;
                 }
@@ -114,7 +123,7 @@ class WithdrawalHistoryList extends StatelessWidget {
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        // Icon
+                        // Ikon Status
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
@@ -125,11 +134,12 @@ class WithdrawalHistoryList extends StatelessWidget {
                         ),
                         const SizedBox(width: 16),
 
-                        // Info
+                        // Informasi Detail Penarikan
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              // Jumlah penarikan
                               Text(
                                 currencyFormat.format(item.amount),
                                 style: TextStyle(
@@ -141,6 +151,7 @@ class WithdrawalHistoryList extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 4),
+                              // Metode penarikan (misal: E-Wallet DANA)
                               Text(
                                 item.method.toUpperCase().replaceAll('_', ' '),
                                 style: TextStyle(
@@ -151,6 +162,7 @@ class WithdrawalHistoryList extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(height: 2),
+                              // Tanggal transaksi
                               Text(
                                 item.createdAt,
                                 style: TextStyle(
@@ -164,7 +176,7 @@ class WithdrawalHistoryList extends StatelessWidget {
                           ),
                         ),
 
-                        // Status Badge
+                        // Label Status (Badge)
                         Container(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 12,

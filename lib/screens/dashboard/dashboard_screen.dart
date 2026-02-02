@@ -16,8 +16,11 @@ import '../badges/badge_screen.dart';
 import '../../providers/badge_provider.dart';
 import '../../widgets/badge_celebration_dialog.dart';
 import '../analytics/analytics_screen.dart';
-import '../../widgets/summary_card.dart';
+import '../../widgets/swipeable_summary_cards.dart';
 
+/// Layar Dashboard Utama.
+/// Menampilkan ringkasan keuangan, daftar badge terbaru, dan menu pintasan ke fitur utama.
+/// Menggunakan [WidgetsBindingObserver] untuk memantau siklus hidup aplikasi (lifecycle) dan memperbarui data saat aplikasi resumed.
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
 
@@ -34,18 +37,21 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(
       this,
-    ); // Keep addObserver for didChangeAppLifecycleState
+    ); // Menambahkan observer untuk lifecycle aplikasi (resume, pause, dll).
+
+    // Mengambil data awal saat frame pertama dirender.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final goalProvider = Provider.of<GoalProvider>(context, listen: false);
       final badgeProvider = Provider.of<BadgeProvider>(context, listen: false);
 
-      // Fetch both dashboard summary and user profile to get latest balance
+      // Fetch semua data secara paralel: ringkasan dashboard, list goal, profil user, dan badge.
       Future.wait([
         goalProvider.fetchDashboardSummary(),
         goalProvider.fetchGoals(),
         authProvider.fetchProfile(),
         badgeProvider.fetchBadges().then((_) {
+          // Jika ada badge baru yang didapat, tampilkan dialog perayaan.
           if (badgeProvider.newlyEarnedBadges.isNotEmpty && mounted) {
             showDialog(
               context: context,
@@ -68,6 +74,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     super.dispose();
   }
 
+  /// Memuat path foto profil dari penyimpanan lokal.
   Future<void> _loadProfilePhoto() async {
     try {
       final photoPath = await PhotoStorageService.getProfilePhotoPath();
@@ -79,6 +86,8 @@ class _DashboardScreenState extends State<DashboardScreen>
     }
   }
 
+  /// Memantau perubahan lifecycle aplikasi.
+  /// Jika aplikasi kembali ke foreground (resumed), muat ulang foto profil.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
@@ -103,6 +112,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: RefreshIndicator(
+          // Fitur Pull-to-Refresh untuk memuat ulang data dashboard.
           onRefresh: () async {
             await goalProvider.fetchDashboardSummary();
             await goalProvider.fetchGoals();
@@ -113,6 +123,7 @@ class _DashboardScreenState extends State<DashboardScreen>
           },
           child: Column(
             children: [
+              // Header Kustom
               _buildCustomHeader(user, context),
 
               Expanded(
@@ -125,16 +136,18 @@ class _DashboardScreenState extends State<DashboardScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // Kartu Ringkasan (Saldo, Progres, dll)
                       if (summary != null)
                         _buildSummaryCard(summary, currency, user),
 
                       const SizedBox(height: 24),
 
-                      // Badge Showcase Section
+                      // Bagian Showcase Badge
                       _buildBadgeShowcase(context),
 
                       const SizedBox(height: 32),
 
+                      // Judul Menu
                       Text(
                         'Menu',
                         style: TextStyle(
@@ -145,6 +158,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       ),
                       const SizedBox(height: 16),
 
+                      // Grid Menu Pintasan
                       GridView.count(
                         shrinkWrap: true,
                         physics: const NeverScrollableScrollPhysics(),
@@ -249,6 +263,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Membangun header kustom dengan nama user, foto profil, dan tombol notifikasi.
   Widget _buildCustomHeader(dynamic user, BuildContext context) {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
     return Container(
@@ -257,6 +272,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          // Sapaan User
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -280,6 +296,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               ),
             ],
           ),
+          // Aksi Kanan (Theme, Notif, Profile)
           GestureDetector(
             onTap: () {
               Navigator.of(
@@ -316,6 +333,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                   },
                 ),
                 const SizedBox(width: 8),
+                // Foto Profil
                 Container(
                   width: 48,
                   height: 48,
@@ -346,6 +364,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Membangun kartu ringkasan menggunakan widget SwipeableSummaryCards.
   Widget _buildSummaryCard(
     Map<String, dynamic> summary,
     NumberFormat currency,
@@ -355,7 +374,21 @@ class _DashboardScreenState extends State<DashboardScreen>
         ? (summary['total_saved'] as num).toDouble()
         : 0.0;
 
-    // Safely parse available balance
+    // Ambil total tunai dan digital
+    final totalCash = (summary['total_cash'] is num)
+        ? (summary['total_cash'] as num).toDouble()
+        : 0.0;
+    final totalDigital = (summary['total_digital'] is num)
+        ? (summary['total_digital'] as num).toDouble()
+        : 0.0;
+    final cashGoalsCount = (summary['cash_goals_count'] is num)
+        ? (summary['cash_goals_count'] as num).toInt()
+        : 0;
+    final digitalGoalsCount = (summary['digital_goals_count'] is num)
+        ? (summary['digital_goals_count'] as num).toInt()
+        : 0;
+
+    // Parsing saldo tersedia dengan aman
     double availableBalance = 0.0;
     var val = summary['available_balance'] ?? summary['balance'];
     if (val is num) {
@@ -364,27 +397,35 @@ class _DashboardScreenState extends State<DashboardScreen>
       availableBalance = double.tryParse(val) ?? 0.0;
     }
 
-    // Fallback to user provider if summary is 0 but user has balance
+    // Fallback ke user provider jika summary 0 tapi user punya saldo (inkonsistensi data sementara)
     if (availableBalance == 0 && user != null && user.availableBalance > 0) {
       availableBalance = user.availableBalance;
     }
 
-    return SummaryCard(
+    final overallProgress = (summary['overall_progress'] is num)
+        ? (summary['overall_progress'] as num).toDouble()
+        : 0.0;
+
+    // Menggunakan SwipeableSummaryCards yang mendukung geser kartu
+    return SwipeableSummaryCards(
       totalSaved: totalSaved,
+      totalCash: totalCash,
+      totalDigital: totalDigital,
+      cashGoalsCount: cashGoalsCount,
+      digitalGoalsCount: digitalGoalsCount,
       availableBalance: availableBalance,
-      overallProgress: (summary['overall_progress'] is num)
-          ? (summary['overall_progress'] as num).toDouble()
-          : 0.0,
+      overallProgress: overallProgress,
       currencyFormat: currency,
     );
   }
 
+  /// Membangun bagian showcase badge yang menampilkan badge yang sudah didapatkan user.
   Widget _buildBadgeShowcase(BuildContext context) {
     final badgeProvider = Provider.of<BadgeProvider>(context);
     final earnedBadges = badgeProvider.earnedBadges;
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
-    // Show max 5 recent badges
+    // Tampilkan maksimal 5 badge terbaru
     final recentBadges = earnedBadges.take(5).toList();
 
     return Column(
@@ -416,7 +457,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(height: 4),
                     Icon(
                       Icons.arrow_forward_ios,
                       size: 14,
@@ -436,6 +477,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           )
         else if (recentBadges.isEmpty)
+          // Tampilan kosong jika belum ada badge
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
@@ -471,6 +513,7 @@ class _DashboardScreenState extends State<DashboardScreen>
             ),
           )
         else
+          // List horizontal badge yang dimiliki
           SizedBox(
             height: 150,
             child: ListView.builder(
@@ -479,7 +522,7 @@ class _DashboardScreenState extends State<DashboardScreen>
               itemBuilder: (context, index) {
                 final badge = recentBadges[index];
 
-                // Determine gradient based on code and theme
+                // Tentukan warna gradient berdasarkan kode badge
                 List<Color> gradientColors;
                 Color textColor;
 
@@ -583,6 +626,7 @@ class _DashboardScreenState extends State<DashboardScreen>
     );
   }
 
+  /// Helper widget untuk membuat item shortcut menu.
   Widget _buildShortcutItem(
     BuildContext context, {
     required IconData icon,

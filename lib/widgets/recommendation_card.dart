@@ -4,8 +4,13 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
+/// Widget kartu rekomendasi pintar yang detail untuk layar Analitik.
+/// Menampilkan saran menabung harian, status urgensi, dan tip cerdas.
 class RecommendationCard extends StatelessWidget {
+  /// Data rekomendasi yang berisi goal_name, urgency, daily_suggestion, dll.
   final Map<String, dynamic> recommendation;
+
+  /// Callback saat kartu ditekan.
   final VoidCallback? onTap;
 
   const RecommendationCard({
@@ -191,6 +196,7 @@ class RecommendationCard extends StatelessWidget {
     );
   }
 
+  /// Mendapatkan warna tema berdasarkan tingkat urgensi goal.
   Color _getUrgencyColor(String urgency) {
     switch (urgency) {
       case 'critical':
@@ -206,6 +212,7 @@ class RecommendationCard extends StatelessWidget {
     }
   }
 
+  /// Mendapatkan emoji status berdasarkan urgensi dan perkembangan goal.
   String _getStatusEmoji(String urgency, String status) {
     if (urgency == 'critical' || urgency == 'overdue') return '🚨';
     if (status == 'ahead') return '🚀';
@@ -215,9 +222,15 @@ class RecommendationCard extends StatelessWidget {
 }
 
 // Compact version for Dashboard
+/// Versi ringkas dari Kartu Rekomendasi Pintar untuk ditampilkan di Dashboard.
 class CompactRecommendationCard extends StatelessWidget {
+  /// Data rekomendasi (opsional jika belum ada goal yang dianalisis).
   final Map<String, dynamic>? recommendation;
+
+  /// Tip umum jika tidak ada rekomendasi spesifik.
   final String? globalTip;
+
+  /// Callback untuk melihat semua rekomendasi.
   final VoidCallback? onViewAll;
 
   const CompactRecommendationCard({
@@ -340,6 +353,7 @@ class CompactRecommendationCard extends StatelessWidget {
     );
   }
 
+  /// Mendapatkan warna gradasi background berdasarkan tingkat urgensi.
   List<Color> _getGradientColors(String urgency) {
     switch (urgency) {
       case 'critical':

@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'dart:io';
+import '../../utils/date_helper.dart';
 import '../../models/goal.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/goal_provider.dart';
 
+/// Layar detail goal.
+/// Menampilkan informasi detail tentang goal, termasuk progres, foto, riwayat transaksi, dan perkiraan (forecast).
 class GoalDetailScreen extends StatefulWidget {
   final Goal goal;
 
@@ -29,6 +32,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   void initState() {
     super.initState();
     _checkImage();
+    // Fetch transaksi dan forecast secara asynchronous setelah frame pertama
     Future.microtask(
       () => Provider.of<TransactionProvider>(
         context,
@@ -46,15 +50,17 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   @override
   void didUpdateWidget(GoalDetailScreen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Cek ulang foto jika path foto berubah
     if (oldWidget.goal.photoPath != widget.goal.photoPath) {
       _checkImage();
     }
   }
 
+  /// Memeriksa keberadaan file foto goal.
   void _checkImage() {
     if (widget.goal.photoPath != null) {
       final file = File(widget.goal.photoPath!);
-      final exists = file.existsSync(); // Done once on init/update
+      final exists = file.existsSync(); // Dilakukan sekali saat init/update
       setState(() {
         _imageExists = exists;
         _goalImage = exists ? file : null;
@@ -76,10 +82,10 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header
+            // Header Kustom
             _CustomHeader(goal: widget.goal, isDarkMode: isDarkMode),
 
-            // Main Content
+            // Konten Utama
             Expanded(
               child: RefreshIndicator(
                 onRefresh: () async {
@@ -100,7 +106,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                         children: [
                           const SizedBox(height: 20),
 
-                          // Goal Image/Photo
+                          // Foto Goal
                           if (_imageExists && _goalImage != null)
                             Center(
                               child: Container(
@@ -126,18 +132,18 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                             ),
                           const SizedBox(height: 24),
 
-                          // Balance Card
+                          // Kartu Saldo dan Progres
                           _BalanceCard(
                             goal: widget.goal,
                             currencyFormat: _currencyFormat,
                           ),
                           const SizedBox(height: 16),
 
-                          // Forecast Section
+                          // Bagian Forecast (Perkiraan)
                           _ForecastSection(goalId: widget.goal.id),
                           const SizedBox(height: 32),
 
-                          // Transaction History Header
+                          // Header Riwayat Transaksi
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 24),
                             child: Row(
@@ -163,7 +169,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                           ),
                           const SizedBox(height: 16),
 
-                          // Transaction List
+                          // Daftar Transaksi
                           if (transactionProvider.isLoading)
                             const Padding(
                               padding: EdgeInsets.all(40),
@@ -218,6 +224,7 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
   }
 }
 
+/// Header kustom menampilkan nama goal, deskripsi singkat, dan tombol kembali.
 class _CustomHeader extends StatelessWidget {
   final Goal goal;
   final bool isDarkMode;
@@ -232,23 +239,27 @@ class _CustomHeader extends StatelessWidget {
       color: Theme.of(context).cardTheme.color,
       child: Row(
         children: [
-          // Back Button
+          // Tombol Kembali
           IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              color: isDarkMode ? Colors.white : Colors.black87,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           const SizedBox(width: 12),
 
-          // Goal Name
+          // Nama Goal dan Deskripsi
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   goal.name,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
+                    color: isDarkMode ? Colors.white : Colors.black87,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -269,7 +280,7 @@ class _CustomHeader extends StatelessWidget {
             ),
           ),
 
-          // Goal Money Icon
+          // Ikon GoalMoney Kecil
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
@@ -292,6 +303,7 @@ class _CustomHeader extends StatelessWidget {
   }
 }
 
+/// Kartu menampilkan saldo saat ini, target, progres bar, dan deadline.
 class _BalanceCard extends StatelessWidget {
   final Goal goal;
   final NumberFormat currencyFormat;
@@ -383,7 +395,7 @@ class _BalanceCard extends StatelessWidget {
             ),
             const SizedBox(height: 16),
 
-            // Target Info
+            // Info Target
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -411,13 +423,91 @@ class _BalanceCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (goal.deadline != null) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white.withOpacity(0.2)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.event_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Tenggat',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          DateFormat(
+                            'dd MMM yyyy',
+                          ).format(DateTime.parse(goal.deadline!)),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        _buildRemainingDaysText(goal.deadline!),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+
+  /// Membangun teks sisa hari deadline dengan warna yang sesuai status.
+  Widget _buildRemainingDaysText(String deadlineStr) {
+    final diff = DateHelper.getDaysFromToday(deadlineStr);
+    final status = DateHelper.getDeadlineStatus(deadlineStr);
+
+    String text;
+    Color color = Colors.white.withOpacity(0.8);
+
+    switch (status) {
+      case DeadlineStatus.overdue:
+        text = 'Terlambat ${diff.abs()} hari';
+        color = Colors.orangeAccent.shade100;
+        break;
+      case DeadlineStatus.dueToday:
+        text = 'Jatuh tempo hari ini!';
+        color = Colors.yellowAccent.shade100;
+        break;
+      case DeadlineStatus.onTrack:
+        text = 'Sisa $diff hari lagi';
+        break;
+    }
+
+    return Text(
+      text,
+      style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w500),
+    );
+  }
 }
 
+/// Widget state kosong untuk transaksi.
 class _EmptyTransactionState extends StatelessWidget {
   final bool isDarkMode;
 
@@ -462,6 +552,8 @@ class _EmptyTransactionState extends StatelessWidget {
   }
 }
 
+/// Widget item kartu transaksi individual.
+/// Mendukung penghapusan transaksi dengan gesture long-press.
 class TransactionCard extends StatelessWidget {
   final String description;
   final double amount;
@@ -491,8 +583,12 @@ class TransactionCard extends StatelessWidget {
     );
     final dateFormat = DateFormat('dd MMM yyyy, HH:mm');
 
-    // Check if transaction can be deleted
-    final canDelete = goal.type == 'cash' || goal.isCompleted;
+    // ✅ UPDATED: Logika cek apakah transaksi bisa dihapus
+    // - Goal cash: selalu bisa hapus transaksi
+    // - Goal digital: hanya bisa hapus jika saldo 0 (sudah ditarik)
+    final hasNoBalance = goal.currentAmount <= 0;
+    final canDelete =
+        goal.type == 'cash' || (goal.type == 'digital' && hasNoBalance);
 
     return GestureDetector(
       onLongPress: canDelete
@@ -519,7 +615,7 @@ class TransactionCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Icon
+              // Icon Panah Bawah (Deposit)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -536,7 +632,7 @@ class TransactionCard extends StatelessWidget {
               ),
               const SizedBox(width: 16),
 
-              // Info
+              // Info Transaksi
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -563,7 +659,7 @@ class TransactionCard extends StatelessWidget {
                 ),
               ),
 
-              // Amount
+              // Jumlah Transaksi
               Text(
                 '+ ${currencyFormat.format(amount)}',
                 style: TextStyle(
@@ -657,6 +753,7 @@ class TransactionCard extends StatelessWidget {
   }
 }
 
+/// Bagian yang menampilkan forecast/perkiraan status goal.
 class _ForecastSection extends StatelessWidget {
   final int goalId;
 

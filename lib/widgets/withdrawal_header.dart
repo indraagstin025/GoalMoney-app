@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+/// Widget Header khusus untuk layar Penarikan (Withdrawal).
+/// Menampilkan logo GoalMoney dan tombol kembali.
 class WithdrawalHeader extends StatelessWidget {
   final bool isDarkMode;
 
@@ -14,9 +16,10 @@ class WithdrawalHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GoalMoney Logo
+          // Logo GoalMoney
           Row(
             children: [
+              // Ikon Celengan celengan (Savings icon)
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
@@ -34,6 +37,7 @@ class WithdrawalHeader extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
+              // Nama Aplikasi
               const Text(
                 'GoalMoney',
                 style: TextStyle(
@@ -46,7 +50,7 @@ class WithdrawalHeader extends StatelessWidget {
             ],
           ),
 
-          // Back Button
+          // Tombol Kembali
           IconButton(
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
             onPressed: () => Navigator.pop(context),

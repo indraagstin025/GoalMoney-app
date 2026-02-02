@@ -4,12 +4,18 @@ import 'dart:io';
 import 'package:intl/intl.dart';
 
 import '../providers/goal_provider.dart';
+import 'deadline_badge.dart';
 import '../screens/goals/goal_detail_screen.dart';
 import '../screens/goals/edit_goal_screen.dart';
 import '../screens/goals/deposit_screen.dart';
 
+/// Widget Kartu Goal yang menampilkan ringkasan informasi sebuah goal.
+/// Menampilkan gambar, nama, progress, nominal terkumpul, dan menu aksi (edit, delete, deposit).
 class GoalCard extends StatefulWidget {
+  /// Objek goal yang akan ditampilkan.
   final dynamic goal;
+
+  /// Status mode gelap untuk penyesuaian warna.
   final bool isDarkMode;
 
   const GoalCard({Key? key, required this.goal, required this.isDarkMode})
@@ -32,11 +38,14 @@ class _GoalCardState extends State<GoalCard> {
   @override
   void didUpdateWidget(GoalCard oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // Cek ulang gambar jika path foto berubah.
     if (oldWidget.goal.photoPath != widget.goal.photoPath) {
       _checkImage();
     }
   }
 
+  /// Memeriksa keberadaan file gambar secara lokal.
+  /// Jika file tidak ditemukan, akan menggunakan placeholder ikon.
   void _checkImage() {
     if (widget.goal.photoPath != null) {
       final file = File(widget.goal.photoPath!);
@@ -61,6 +70,7 @@ class _GoalCardState extends State<GoalCard> {
       decimalDigits: 0,
     );
 
+    // Hitung progress (0.0 - 1.0).
     final progress = (widget.goal.progress / 100).clamp(0.0, 1.0);
     final isCompleted = progress >= 1.0;
 
@@ -69,6 +79,7 @@ class _GoalCardState extends State<GoalCard> {
       decoration: BoxDecoration(
         color: widget.isDarkMode ? Colors.grey.shade800 : Colors.white,
         borderRadius: BorderRadius.circular(20),
+        // Border hijau jika completed, abu-abu jika belum.
         border: Border.all(
           color: isCompleted
               ? Colors.green.shade300
@@ -91,6 +102,7 @@ class _GoalCardState extends State<GoalCard> {
         color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
+          // Navigasi ke detail screen saat kartu ditekan.
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute(
@@ -103,10 +115,10 @@ class _GoalCardState extends State<GoalCard> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Header Row
+                // Baris Header: Gambar, Nama, Status, Tombol Menu
                 Row(
                   children: [
-                    // Goal Image/Icon
+                    // Gambar Goal / Ikon Placeholder
                     Container(
                       width: 64,
                       height: 64,
@@ -144,7 +156,7 @@ class _GoalCardState extends State<GoalCard> {
                     ),
                     const SizedBox(width: 16),
 
-                    // Goal Name & Status
+                    // Nama Goal & Status Badge
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -165,6 +177,7 @@ class _GoalCardState extends State<GoalCard> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
+                              // Badge Tercapai
                               if (isCompleted)
                                 Container(
                                   padding: const EdgeInsets.symmetric(
@@ -213,18 +226,23 @@ class _GoalCardState extends State<GoalCard> {
                               fontWeight: FontWeight.w500,
                             ),
                           ),
+                          // Badge Deadline (Tenggat Waktu)
+                          if (widget.goal.deadline != null) ...[
+                            const SizedBox(height: 8),
+                            DeadlineBadge(deadline: widget.goal.deadline!),
+                          ],
                         ],
                       ),
                     ),
 
-                    // Actions Menu
+                    // Menu Aksi (Titik tiga)
                     _buildActionsMenu(context, isCompleted),
                   ],
                 ),
 
                 const SizedBox(height: 20),
 
-                // Amount Info
+                // Info Nominal (Terkumpul vs Target)
                 Container(
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
@@ -241,7 +259,7 @@ class _GoalCardState extends State<GoalCard> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      // Current Amount
+                      // Nominal Terkumpul
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -269,7 +287,7 @@ class _GoalCardState extends State<GoalCard> {
                         ),
                       ),
 
-                      // Divider
+                      // Divider Vertikal
                       Container(
                         height: 40,
                         width: 1,
@@ -278,7 +296,7 @@ class _GoalCardState extends State<GoalCard> {
                             : Colors.grey.shade300,
                       ),
 
-                      // Target Amount
+                      // Nominal Target
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.end,
@@ -313,7 +331,7 @@ class _GoalCardState extends State<GoalCard> {
 
                 const SizedBox(height: 16),
 
-                // Progress Bar
+                // Progress Bar Visual
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -391,6 +409,7 @@ class _GoalCardState extends State<GoalCard> {
     );
   }
 
+  /// Membangun menu popup untuk aksi (Deposit, Edit, Hapus).
   Widget _buildActionsMenu(BuildContext context, bool isCompleted) {
     return PopupMenuButton(
       icon: Icon(
@@ -401,7 +420,7 @@ class _GoalCardState extends State<GoalCard> {
       itemBuilder: (context) {
         final items = <PopupMenuEntry<String>>[];
 
-        // Only show deposit if goal not completed
+        // Hanya tampilkan opsi 'Deposit' jika goal belum tercapai.
         if (!isCompleted) {
           items.add(
             PopupMenuItem(
@@ -466,7 +485,7 @@ class _GoalCardState extends State<GoalCard> {
           );
         }
 
-        // Always show edit
+        // Selalu tampilkan opsi 'Edit'.
         items.add(
           PopupMenuItem(
             value: 'edit',
@@ -526,10 +545,13 @@ class _GoalCardState extends State<GoalCard> {
           ),
         );
 
-        // Only show delete for cash goals OR completed goals
-        // Digital goals that are incomplete cannot be deleted
+        // ATURAN PENGHAPUSAN:
+        // - Goal Tunai (Cash): Bisa dihapus kapan saja.
+        // - Goal Digital/Saldo: Hanya bisa dihapus jika saldo 0 (sudah ditarik semua).
         final goalType = widget.goal.type ?? 'digital';
-        final canDelete = goalType == 'cash' || isCompleted;
+        final hasNoBalance = widget.goal.currentAmount <= 0;
+        final canDelete =
+            goalType == 'cash' || (goalType == 'digital' && hasNoBalance);
 
         if (canDelete) {
           items.add(
@@ -627,10 +649,8 @@ class _GoalCardState extends State<GoalCard> {
     );
   }
 
+  /// Menampilkan dialog konfirmasi sebelum menghapus goal.
   void _confirmDelete(BuildContext context, dynamic goal) {
-    // Show delete confirmation
-    // Note: This will only be called for cash goals or completed goals
-    // since we hide the delete button for incomplete digital goals
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(

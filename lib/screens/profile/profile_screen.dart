@@ -9,7 +9,11 @@ import '../../providers/badge_provider.dart';
 import '../../providers/goal_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../auth/login_screen.dart';
+import '../about/about_app_screen.dart';
 
+/// Layar Profil Pengguna.
+/// Memungkinkan pengguna melihat dan mengedit informasi profil, mengubah foto profil,
+/// serta mengakses pengaturan aplikasi seperti tema dan logout.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
 
@@ -33,6 +37,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfilePhoto();
   }
 
+  /// Memuat path foto profil yang tersimpan secara lokal.
   Future<void> _loadProfilePhoto() async {
     try {
       final photoPath = await PhotoStorageService.getProfilePhotoPath();
@@ -44,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  /// Memilih foto baru dari galeri dan menyimpannya.
   Future<void> _pickProfilePhoto() async {
     try {
       final photoPath = await PhotoStorageService.pickAndSaveProfilePhoto();
@@ -77,6 +83,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     super.dispose();
   }
 
+  /// Mengupdate informasi profil pengguna (nama dan email).
   Future<void> _updateProfile() async {
     if (_nameCtrl.text.isEmpty || _emailCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -144,11 +151,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         children: [
                           const SizedBox(height: 20),
 
-                          // Profile Photo Section
+                          // Bagian Foto Profil
                           _buildProfilePhoto(isDarkMode),
                           const SizedBox(height: 24),
 
-                          // Profile Info Card
+                          // Kartu Informasi Profil atau Form Edit
                           if (!_isEditing) ...[
                             _buildProfileInfoCard(user, isDarkMode),
                             const SizedBox(height: 24),
@@ -159,7 +166,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
                           const SizedBox(height: 32),
 
-                          // Settings Section
+                          // Bagian Pengaturan
                           _buildSettingsSection(isDarkMode),
                         ],
                       ),
@@ -171,6 +178,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Widget header kustom.
   Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -212,7 +220,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           // Back Button
           IconButton(
-            icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              color: isDarkMode ? Colors.white : Colors.black87,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
         ],
@@ -220,6 +231,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Membangun widget foto profil dengan indikator edit.
   Widget _buildProfilePhoto(bool isDarkMode) {
     return GestureDetector(
       onTap: _pickProfilePhoto,
@@ -288,6 +300,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Membangun kartu informasi profil yang menampilkan data user.
   Widget _buildProfileInfoCard(dynamic user, bool isDarkMode) {
     return Container(
       width: double.infinity,
@@ -342,6 +355,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Helper untuk baris informasi (ikon, label, nilai).
   Widget _buildInfoRow({
     required IconData icon,
     required String label,
@@ -389,6 +403,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Tombol untuk mengaktifkan mode edit.
   Widget _buildEditButton() {
     return SizedBox(
       width: double.infinity,
@@ -432,6 +447,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Form untuk mengedit profil.
   Widget _buildEditForm(dynamic user, bool isDarkMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -629,6 +645,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Membangun bagian pengaturan (Mode Gelap, Ubah Password, Tentang App, Logout).
   Widget _buildSettingsSection(bool isDarkMode) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -695,20 +712,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Tentang Aplikasi',
                 isDarkMode: isDarkMode,
                 onTap: () {
-                  showAboutDialog(
-                    context: context,
-                    applicationName: 'GoalMoney',
-                    applicationVersion: '1.0.0',
-                    applicationLegalese: '© 2024 GoalMoney',
-                    children: [
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Author:',
-                        style: TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const Text('Indra Agustin - 714230051'),
-                      const Text('Efendi Sugiantoro - 714230018'),
-                    ],
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AboutAppScreen()),
                   );
                 },
               ),
@@ -793,6 +799,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  /// Helper untuk membangun tile pengaturan.
   Widget _buildSettingTile({
     required IconData icon,
     required String title,

@@ -4,8 +4,11 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../models/goal.dart';
 import '../../providers/goal_provider.dart';
+import '../../widgets/deadline_picker_field.dart';
 import '../../core/photo_storage_service.dart';
 
+/// Layar untuk mengedit goal yang sudah ada.
+/// Memungkinkan pengguna mengubah nama, target jumlah, deskripsi, foto, dan deadline goal.
 class EditGoalScreen extends StatefulWidget {
   final Goal goal;
 
@@ -22,12 +25,15 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
   late TextEditingController _descCtrl;
   bool _isLoading = false;
   String? _goalPhotoPath;
+  DateTime? _selectedDeadline;
+  final _dateFormat = DateFormat('yyyy-MM-dd');
+  final _displayDateFormat = DateFormat('dd MMM yyyy');
 
   @override
   void initState() {
     super.initState();
     _nameCtrl = TextEditingController(text: widget.goal.name);
-    // Format initial value with thousand separators
+    // Format nilai awal dengan pemisah ribuan
     final initialTarget = NumberFormat(
       '#,###',
       'id_ID',
@@ -35,6 +41,9 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
     _targetCtrl = TextEditingController(text: initialTarget);
     _descCtrl = TextEditingController(text: widget.goal.description ?? '');
     _goalPhotoPath = widget.goal.photoPath;
+    if (widget.goal.deadline != null) {
+      _selectedDeadline = DateTime.parse(widget.goal.deadline!);
+    }
   }
 
   @override
@@ -45,6 +54,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
     super.dispose();
   }
 
+  /// Memilih foto goal dari galeri dan menyimpannya.
   Future<void> _pickGoalPhoto() async {
     try {
       final photoPath = await PhotoStorageService.pickAndSaveGoalPhoto(
@@ -73,6 +83,35 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
     }
   }
 
+  /// Menampilkan date picker untuk memilih deadline baru.
+  Future<void> _selectDeadline() async {
+    final now = DateTime.now();
+    final initialDate = _selectedDeadline ?? now.add(const Duration(days: 30));
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: now,
+      lastDate: now.add(const Duration(days: 365 * 10)),
+      builder: (context, child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.fromSeed(
+              seedColor: Colors.green,
+              primary: Colors.green.shade700,
+              brightness: Theme.of(context).brightness,
+            ),
+          ),
+          child: child!,
+        );
+      },
+    );
+
+    if (picked != null && picked != _selectedDeadline) {
+      setState(() => _selectedDeadline = picked);
+    }
+  }
+
+  /// Mengirimkan perubahan goal ke provider.
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -82,11 +121,14 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
         _targetCtrl.text.replaceAll('.', '').replaceAll(',', ''),
       );
 
-      // Use listen: false for the provider call inside a method
+      // Gunakan listen: false untuk panggilan provider di dalam metode
       await Provider.of<GoalProvider>(context, listen: false).updateGoal(
         id: widget.goal.id,
         name: _nameCtrl.text,
         targetAmount: target,
+        deadline: _selectedDeadline != null
+            ? _dateFormat.format(_selectedDeadline!)
+            : null,
         description: _descCtrl.text.isNotEmpty ? _descCtrl.text : null,
       );
 
@@ -124,10 +166,10 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header
+            // Header Kustom
             const _CustomHeader(),
 
-            // Main Content
+            // Konten Utama
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
@@ -138,7 +180,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                     children: [
                       const SizedBox(height: 20),
 
-                      // Title
+                      // Judul
                       Text(
                         'Edit Goal ✏️',
                         style: TextStyle(
@@ -159,7 +201,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Photo Section
+                      // Bagian Foto
                       Center(
                         child: _GoalPhotoPicker(
                           photoPath: _goalPhotoPath,
@@ -168,7 +210,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Goal Name Field
+                      // Field Nama Goal
                       _InputField(
                         label: 'Nama Goal',
                         controller: _nameCtrl,
@@ -185,7 +227,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Target Amount Field
+                      // Field Target Jumlah
                       CurrencyInputField(
                         label: 'Target Jumlah',
                         controller: _targetCtrl,
@@ -207,7 +249,17 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Description Field
+                      // Field Deadline (Opsional)
+                      DeadlinePickerField(
+                        selectedDate: _selectedDeadline,
+                        displayFormat: _displayDateFormat,
+                        isDarkMode: isDarkMode,
+                        onTap: _selectDeadline,
+                        onClear: () => setState(() => _selectedDeadline = null),
+                      ),
+                      const SizedBox(height: 20),
+
+                      // Field Deskripsi
                       _InputField(
                         label: 'Deskripsi (Opsional)',
                         controller: _descCtrl,
@@ -219,10 +271,10 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Action Buttons
+                      // Tombol Aksi
                       Row(
                         children: [
-                          // Cancel Button
+                          // Tombol Batal
                           Expanded(
                             child: SizedBox(
                               height: 56,
@@ -252,7 +304,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
                           ),
                           const SizedBox(width: 16),
 
-                          // Save Button
+                          // Tombol Simpan
                           Expanded(
                             flex: 2,
                             child: SizedBox(
@@ -333,6 +385,7 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
   }
 }
 
+/// Header kustom sederhana dengan tombol kembali.
 class _CustomHeader extends StatelessWidget {
   const _CustomHeader({Key? key}) : super(key: key);
 
@@ -344,7 +397,7 @@ class _CustomHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GoalMoney Logo
+          // Logo GoalMoney
           Row(
             children: [
               Container(
@@ -376,7 +429,7 @@ class _CustomHeader extends StatelessWidget {
             ],
           ),
 
-          // Back Button
+          // Tombol Kembali
           IconButton(
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
             onPressed: () => Navigator.pop(context),
@@ -387,6 +440,7 @@ class _CustomHeader extends StatelessWidget {
   }
 }
 
+/// Widget pemilih foto goal. Menampilkan foto saat ini atau placeholder.
 class _GoalPhotoPicker extends StatelessWidget {
   final String? photoPath;
   final VoidCallback onTap;
@@ -493,6 +547,7 @@ class _GoalPhotoPicker extends StatelessWidget {
   }
 }
 
+/// Input field generik untuk teks dengan label dan ikon.
 class _InputField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
@@ -576,7 +631,7 @@ class _InputField extends StatelessWidget {
   }
 }
 
-/// Currency Input Field with proper placeholder behavior
+/// Input field khusus mata uang dengan format Rupiah otomatis.
 class CurrencyInputField extends StatefulWidget {
   final String label;
   final TextEditingController controller;

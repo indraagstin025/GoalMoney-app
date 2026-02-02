@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../providers/goal_provider.dart';
 import '../../core/api_client.dart';
 
+/// Layar Kalender Streak yang menampilkan heatmap aktivitas menabung pengguna.
+/// Mirip dengan GitHub contribution graph, menunjukkan intensitas aktivitas harian.
 class StreakCalendarScreen extends StatefulWidget {
   const StreakCalendarScreen({super.key});
 
@@ -15,21 +17,32 @@ class StreakCalendarScreen extends StatefulWidget {
 }
 
 class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
+  /// Instance ApiClient untuk mengambil data streak dari server.
   final ApiClient _apiClient = ApiClient();
+
+  /// Tahun yang dipilih untuk tampilan kalender.
   int _selectedYear = DateTime.now().year;
+
+  /// Bulan opsional untuk filter (jika diperlukan detail bulanan).
   int? _selectedMonth;
 
+  /// Data streak mentah (current streak, longest streak, calendar data).
   Map<String, dynamic>? _streakData;
+
+  /// Status loading data.
   bool _isLoading = true;
+
+  /// Pesan error jika fetching gagal.
   String? _error;
 
+  /// Formatter mata uang Rupiah.
   final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
     decimalDigits: 0,
   );
 
-  // Helper to safely convert API values (String/num) to num
+  /// Helper konversi nilai API ke [num] secara aman.
   num _toNum(dynamic value) {
     if (value == null) return 0;
     if (value is num) return value;
@@ -89,55 +102,120 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Streak Calendar'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _loadStreakData,
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(child: Text('Error: $_error'))
-          : RefreshIndicator(
-              onRefresh: _loadStreakData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Streak Stats Card
-                    _buildStreakStatsCard(isDark),
-                    const SizedBox(height: 16),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Branded Header
+            _buildCustomHeader(context, isDark),
 
-                    // Year Selector
-                    _buildYearSelector(isDark),
-                    const SizedBox(height: 16),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(child: Text('Error: $_error'))
+                  : RefreshIndicator(
+                      onRefresh: _loadStreakData,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Streak Stats Card
+                            _buildStreakStatsCard(isDark),
+                            const SizedBox(height: 16),
 
-                    // Calendar Heatmap
-                    _buildCalendarHeatmap(isDark),
-                    const SizedBox(height: 16),
+                            // Year Selector
+                            _buildYearSelector(isDark),
+                            const SizedBox(height: 16),
 
-                    // Monthly Summary
-                    _buildMonthlySummary(isDark),
-                    const SizedBox(height: 16),
+                            // Calendar Heatmap
+                            _buildCalendarHeatmap(isDark),
+                            const SizedBox(height: 16),
 
-                    // Legend
-                    _buildLegend(isDark),
-                  ],
-                ),
-              ),
+                            // Monthly Summary
+                            _buildMonthlySummary(isDark),
+                            const SizedBox(height: 16),
+
+                            // Legend
+                            _buildLegend(isDark),
+                          ],
+                        ),
+                      ),
+                    ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
+  /// Membangun header kustom layar.
+  Widget _buildCustomHeader(BuildContext context, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Theme.of(context).cardTheme.color,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // GoalMoney Logo
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade700, Colors.green.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.savings_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'GoalMoney',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.lightGreen,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+
+          // Actions
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.refresh,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                onPressed: _loadStreakData,
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Membangun kartu statistik streak (Current, Longest, Active Days).
   Widget _buildStreakStatsCard(bool isDark) {
     final streak = _streakData?['streak'] ?? {};
     final currentStreak = streak['current'] ?? 0;
@@ -148,19 +226,15 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: isActiveToday
-              ? [Colors.orange, Colors.deepOrange]
-              : [Colors.grey.shade600, Colors.grey.shade800],
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4CAF50), Color(0xFF81C784)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: (isActiveToday ? Colors.orange : Colors.grey).withOpacity(
-              0.3,
-            ),
+            color: Colors.green.withOpacity(0.3),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -215,6 +289,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     );
   }
 
+  /// Item statistik streak individu.
   Widget _buildStreakStat(
     String icon,
     String value,
@@ -241,6 +316,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     );
   }
 
+  /// Selektor tahun untuk navigasi data historis.
   Widget _buildYearSelector(bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -269,6 +345,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     );
   }
 
+  /// Membangun heatmap kalender 12 bulan.
   Widget _buildCalendarHeatmap(bool isDark) {
     final calendar = _streakData?['calendar'] as Map<String, dynamic>? ?? {};
 
@@ -289,7 +366,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Aktivitas Menabung',
+            '📅 Aktivitas Menabung',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 16),
@@ -308,7 +385,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
-                    color: Colors.grey[600],
+                    color: isDark ? Colors.grey.shade500 : Colors.black87,
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -346,6 +423,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     );
   }
 
+  /// Mendapatkan warna berdasarkan intensitas tabungan (0-4).
   Color _getIntensityColor(int intensity, bool isDark) {
     switch (intensity) {
       case 4:
@@ -379,6 +457,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     return months[month - 1];
   }
 
+  /// Membangun daftar ringkasan total tabungan per bulan.
   Widget _buildMonthlySummary(bool isDark) {
     final summary = _streakData?['monthly_summary'] as List? ?? [];
 
@@ -399,7 +478,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            'Ringkasan Bulanan',
+            '📜 Ringkasan Bulanan',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
@@ -414,7 +493,9 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
                 children: [
                   Text(
                     month['month_name'] ?? '',
-                    style: TextStyle(color: Colors.grey[600]),
+                    style: TextStyle(
+                      color: isDark ? Colors.grey.shade400 : Colors.black87,
+                    ),
                   ),
                   Text(
                     currencyFormatter.format(_toNum(total)),
@@ -429,6 +510,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     );
   }
 
+  /// Membangun legenda warna intensitas heatmap.
   Widget _buildLegend(bool isDark) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -452,6 +534,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
     );
   }
 
+  /// Menampilkan detail transaksi untuk hari yang dipilih melalui BottomSheet.
   void _showDayDetail(String date, Map<String, dynamic> data) {
     showModalBottomSheet(
       context: context,

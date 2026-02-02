@@ -10,8 +10,14 @@ import '../../widgets/currency_input_field.dart';
 import '../../widgets/withdrawal_header.dart';
 import '../../widgets/withdrawal_history_list.dart';
 
+/// Layar Penarikan Dana yang memungkinkan user untuk menarik saldo tabungan.
+/// Mendukung penarikan dari saldo akun umum atau dari goal tertentu yang sudah selesai.
+/// User dapat memilih berbagai metode penarikan seperti DANA, OVO, ShopeePay, dan Transfer Bank.
 class WithdrawalScreen extends StatefulWidget {
+  /// Nominal yang sudah terisi otomatis (misalnya dari dashboard).
   final double? prefilledAmount;
+
+  /// Flag apakah penarikan berasal dari dana overflow (goal selesai).
   final bool fromOverflow;
 
   const WithdrawalScreen({
@@ -26,12 +32,22 @@ class WithdrawalScreen extends StatefulWidget {
 
 class _WithdrawalScreenState extends State<WithdrawalScreen>
     with SingleTickerProviderStateMixin {
+  /// Kunci form untuk validasi input.
   final _formKey = GlobalKey<FormState>();
+
+  /// Kontroler untuk input jumlah penarikan.
   late TextEditingController _amountCtrl;
+
+  /// Kontroler untuk input nomor rekening/e-wallet.
   final _accountCtrl = TextEditingController();
+
+  /// Kontroler untuk catatan tambahan.
   final _notesCtrl = TextEditingController();
 
+  /// Metode penarikan yang dipilih (Default: dana).
   String _selectedMethod = 'dana';
+
+  /// Ikon yang sesuai untuk setiap metode penarikan.
   final Map<String, IconData> _methodIcons = {
     'dana': Icons.account_balance_wallet,
     'gopay': Icons.payment,
@@ -42,14 +58,22 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     'pospay': Icons.local_post_office_rounded,
   };
 
+  /// Status loading saat memproses transaksi.
   bool _isLoading = false;
+
+  /// Total tabungan user dari seluruh goal digital.
   double _totalSavings = 0;
 
-  // Goal selection
+  /// ID goal yang dipilih untuk sumber dana.
   int? _selectedGoalId;
+
+  /// Saldo yang tersedia pada goal yang dipilih.
   double _selectedGoalBalance = 0;
 
+  /// Kontroler untuk TabView (Request vs Riwayat).
   late TabController _tabController;
+
+  /// Formatter mata uang Rupiah.
   final _currencyFormat = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
@@ -77,6 +101,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     super.dispose();
   }
 
+  /// Mengambil data ringkasan dashboard dan daftar goal dari server.
   void _fetchData() async {
     try {
       final provider = Provider.of<GoalProvider>(context, listen: false);
@@ -88,17 +113,16 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
           final total = provider.summary!['total_saved'];
           _totalSavings = (total is num) ? total.toDouble() : 0.0;
 
-          // Auto-select first goal if available
-          if (provider.goals.isNotEmpty) {
-            _selectedGoalId = provider.goals.first.id;
-            _selectedGoalBalance = provider.goals.first.currentAmount;
+          // ✅ Auto-select first DIGITAL goal (cash goals excluded from withdrawal)
+          final withdrawableGoals = provider.goals
+              .where((g) => (g.type ?? 'digital') == 'digital')
+              .toList();
 
-            // Set method based on goal type
-            if (provider.goals.first.type == 'cash') {
-              _selectedMethod = 'manual';
-            } else {
-              _selectedMethod = 'dana';
-            }
+          if (withdrawableGoals.isNotEmpty) {
+            _selectedGoalId = withdrawableGoals.first.id;
+            _selectedGoalBalance = withdrawableGoals.first.currentAmount;
+            // Always digital, so default to 'dana'
+            _selectedMethod = 'dana';
           }
         });
       }
@@ -107,6 +131,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     }
   }
 
+  /// Mengirim permintaan penarikan dana ke backend setelah validasi.
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -268,6 +293,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     }
   }
 
+  /// Menampilkan dialog loading "Sedang Memproses" dengan hitung mundur simulasi.
   Future<void> _showProcessingDialog() async {
     int secondsRemaining = 5;
 
@@ -399,6 +425,7 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
 
   // Header widget now extracted to WithdrawalHeader widget file
 
+  /// Membangun konten Tab Request Penarikan (Formulir).
   Widget _buildRequestTab(bool isDarkMode) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -505,14 +532,18 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
             const SizedBox(height: 8),
             Consumer2<GoalProvider, AuthProvider>(
               builder: (context, goalProvider, authProvider, _) {
-                final goals = goalProvider.goals;
+                // ✅ FILTER: Only digital goals can be withdrawn
+                final withdrawableGoals = goalProvider.goals
+                    .where((g) => (g.type ?? 'digital') == 'digital')
+                    .toList();
+
                 final availableBalance =
                     authProvider.user?.availableBalance ?? 0;
 
                 return DropdownButtonFormField<int?>(
                   isExpanded: true,
                   value:
-                      (goals.any((g) => g.id == _selectedGoalId) ||
+                      (withdrawableGoals.any((g) => g.id == _selectedGoalId) ||
                           _selectedGoalId == null)
                       ? _selectedGoalId
                       : null,
@@ -559,8 +590,8 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                         style: const TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
-                    // Goal Options
-                    ...goals
+                    // ✅ ONLY DIGITAL GOALS (Cash goals filtered out)
+                    ...withdrawableGoals
                         .fold<Map<int, dynamic>>({}, (map, goal) {
                           map[goal.id] = goal;
                           return map;
@@ -584,15 +615,14 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
                         if (_selectedMethod == 'manual')
                           _selectedMethod = 'dana';
                       } else {
-                        final selectedIndex = goals.indexWhere(
+                        final selectedIndex = withdrawableGoals.indexWhere(
                           (g) => g.id == val,
                         );
                         if (selectedIndex != -1) {
-                          final selectedGoal = goals[selectedIndex];
+                          final selectedGoal = withdrawableGoals[selectedIndex];
                           _selectedGoalBalance = selectedGoal.currentAmount;
-                          if (selectedGoal.type == 'cash') {
-                            _selectedMethod = 'manual';
-                          } else if (_selectedMethod == 'manual') {
+                          // Digital goals never need 'manual' method
+                          if (_selectedMethod == 'manual') {
                             _selectedMethod = 'dana';
                           }
                         }
@@ -650,20 +680,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
             // Method Dropdown filtered by Goal Type
             Builder(
               builder: (context) {
-                // Calculate allowed methods
-                final allowedMethods = _methodIcons.keys.where((m) {
-                  if (_selectedGoalId == null) return m != 'manual';
-                  try {
-                    final goal = Provider.of<GoalProvider>(
-                      context,
-                      listen: false,
-                    ).goals.firstWhere((g) => g.id == _selectedGoalId);
-                    if (goal.type == 'cash') return m == 'manual';
-                    return m != 'manual';
-                  } catch (e) {
-                    return true;
-                  }
-                }).toList();
+                // ✅ SIMPLIFIED: Cash goals already filtered out, so we only need to exclude 'manual'
+                final allowedMethods = _methodIcons.keys
+                    .where(
+                      (m) => m != 'manual',
+                    ) // Digital goals never use manual
+                    .toList();
 
                 return DropdownButtonFormField<String>(
                   value: _selectedMethod,
@@ -899,8 +921,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
   }
 
   // History widget now extracted to WithdrawalHistoryList widget file
+  /// Membangun konten Tab Riwayat Penarikan (Daftar transaksi).
   Widget _buildHistoryTab(bool isDarkMode) {
-    return WithdrawalHistoryList(isDarkMode: isDarkMode);
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: WithdrawalHistoryList(isDarkMode: isDarkMode),
+    );
   }
 }
 

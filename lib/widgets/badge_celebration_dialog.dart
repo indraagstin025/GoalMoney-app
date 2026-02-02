@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart' hide Badge;
 import '../models/badge.dart';
 
+/// Dialog perayaan saat pengguna mendapatkan badge baru.
+/// Menampilkan satu per satu badge yang diperoleh dengan animasi yang menarik.
 class BadgeCelebrationDialog extends StatefulWidget {
   final List<Badge> newBadges;
 
@@ -20,6 +22,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
   @override
   void initState() {
     super.initState();
+    // Inisialisasi controller animasi untuk efek muncul (elastic)
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -31,7 +34,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
     );
 
     _rotationAnimation = Tween<double>(
-      begin: -0.2,
+      begin: -0.2, // Mulai dari sedikit miring
       end: 0.0,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.elasticOut));
 
@@ -44,6 +47,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
     super.dispose();
   }
 
+  /// Pindah ke badge berikutnya jika ada, atau tutup dialog jika sudah semua.
   void _nextBadge() {
     if (_currentIndex < widget.newBadges.length - 1) {
       _controller.reverse().then((_) {
@@ -68,7 +72,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Background Glow
+          // Efek Cahaya Belakang (Glow)
           Container(
             width: 300,
             height: 400,
@@ -84,7 +88,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
             ),
           ),
 
-          // Main Content
+          // Konten Utama dengan Animasi Skala dan Rotasi
           ScaleTransition(
             scale: _scaleAnimation,
             child: RotationTransition(
@@ -118,13 +122,13 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Shiny badge at the top
+                    // Teks Header Berkilau (Shiny header)
                     ShaderMask(
                       shaderCallback: (bounds) => const LinearGradient(
                         colors: [Colors.amber, Colors.orange, Colors.yellow],
                       ).createShader(bounds),
                       child: const Text(
-                        '✨ NEW ACHIEVEMENT! ✨',
+                        '✨ PENCAPAIAN BARU! ✨',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w900,
@@ -144,11 +148,11 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
                     ),
                     const SizedBox(height: 35),
 
-                    // Badge Icon Container with Orbit Effect
+                    // Kontainer Ikon Badge dengan Efek Cincin (Orbit)
                     Stack(
                       alignment: Alignment.center,
                       children: [
-                        // Decorative Ring
+                        // Cincin Dekoratif
                         Container(
                           width: 150,
                           height: 150,
@@ -160,7 +164,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
                             ),
                           ),
                         ),
-                        // Inner Glow
+                        // Cahaya Dalam
                         Container(
                           width: 130,
                           height: 130,
@@ -175,7 +179,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
                             ],
                           ),
                         ),
-                        // Main Icon
+                        // Ikon Utama dengan Gradien Emas
                         Container(
                           width: 110,
                           height: 110,
@@ -212,6 +216,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
                     ),
 
                     const SizedBox(height: 32),
+                    // Nama Badge
                     Text(
                       badge.name,
                       style: TextStyle(
@@ -224,6 +229,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
                       ),
                     ),
                     const SizedBox(height: 12),
+                    // Deskripsi Badge
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       child: Text(
@@ -241,7 +247,7 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
                     ),
                     const SizedBox(height: 40),
 
-                    // Button
+                    // Tombol Aksi (Lanjut atau Klaim)
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
@@ -282,14 +288,13 @@ class _BadgeCelebrationDialogState extends State<BadgeCelebrationDialog>
               ),
             ),
           ),
-
-          // Particle effects (Optional - simulated with small dots if needed)
         ],
       ),
     );
   }
 }
 
+/// Fungsi helper untuk menampilkan dialog perayaan badge.
 void showBadgeCelebration(BuildContext context, List<Badge> newBadges) {
   if (newBadges.isEmpty) return;
 

@@ -1,22 +1,27 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 
+/// Layanan untuk mengelola notifikasi lokal (Local Notifications).
+/// Digunakan untuk menampilkan notifikasi sistem saat aplikasi sedang berjalan di foreground
+/// atau saat menerima data payload notifikasi dari FCM.
 class LocalNotificationService {
+  /// Instance plugin FlutterLocalNotifications.
   static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  /// Menginisialisasi pengaturan notifikasi lokal untuk Android dan iOS.
   static Future<void> initialize() async {
-    // Android initialization settings
+    // Pengaturan inisialisasi Android (icon default).
     const AndroidInitializationSettings androidSettings =
         AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    // iOS initialization settings (optional)
+    // Pengaturan inisialisasi iOS (meminta izin alert, badge, dan sound).
     const DarwinInitializationSettings iosSettings =
         DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
+          requestAlertPermission: true,
+          requestBadgePermission: true,
+          requestSoundPermission: true,
+        );
 
     const InitializationSettings initSettings = InitializationSettings(
       android: androidSettings,
@@ -26,15 +31,16 @@ class LocalNotificationService {
     await _notificationsPlugin.initialize(
       initSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification tap
-        print('[LocalNotification] Notification tapped: ${response.payload}');
+        // Menangani aksi saat notifikasi diklik/ditap oleh user.
+        print('[LocalNotification] Notifikasi diklik: ${response.payload}');
       },
     );
 
-    // Create notification channel for Android
+    // Membuat saluran notifikasi (Notification Channel) khusus untuk Android 8.0+.
+    // Channel ini penting agar notifikasi memiliki prioritas tinggi dan suara.
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'high_importance_channel',
-      'High Importance Notifications',
+      'high_importance_channel', // ID Channel
+      'High Importance Notifications', // Nama Channel yang muncul di pengaturan
       description: 'This channel is used for important notifications.',
       importance: Importance.high,
       playSound: true,
@@ -42,28 +48,32 @@ class LocalNotificationService {
 
     await _notificationsPlugin
         .resolvePlatformSpecificImplementation<
-            AndroidFlutterLocalNotificationsPlugin>()
+          AndroidFlutterLocalNotificationsPlugin
+        >()
         ?.createNotificationChannel(channel);
 
-    print('[LocalNotification] Initialized successfully');
+    print('[LocalNotification] Berhasil diinisialisasi');
   }
 
-  // Show notification from FCM message
+  /// Menampilkan notifikasi lokal berdasarkan pesan RemoteMessage dari FCM.
   static Future<void> showNotification(RemoteMessage message) async {
     final notification = message.notification;
     if (notification == null) return;
 
+    // Detail pengaturan tampilan notifikasi untuk Android.
     const AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
-      'high_importance_channel',
-      'High Importance Notifications',
-      channelDescription: 'This channel is used for important notifications.',
-      importance: Importance.high,
-      priority: Priority.high,
-      showWhen: true,
-      icon: '@mipmap/ic_launcher',
-    );
+          'high_importance_channel',
+          'High Importance Notifications',
+          channelDescription:
+              'This channel is used for important notifications.',
+          importance: Importance.high,
+          priority: Priority.high,
+          showWhen: true,
+          icon: '@mipmap/ic_launcher',
+        );
 
+    // Detail pengaturan tampilan notifikasi untuk iOS.
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,
       presentBadge: true,
@@ -75,14 +85,15 @@ class LocalNotificationService {
       iOS: iosDetails,
     );
 
+    // Menampilkan notifikasi ke sistem bar.
     await _notificationsPlugin.show(
-      notification.hashCode,
+      notification.hashCode, // ID Unik Notifikasi
       notification.title ?? 'Notifikasi',
       notification.body ?? '',
       platformDetails,
-      payload: message.data.toString(),
+      payload: message.data.toString(), // Data tambahan saat notifikasi diklik
     );
 
-    print('[LocalNotification] Displayed: ${notification.title}');
+    print('[LocalNotification] Ditampilkan: ${notification.title}');
   }
 }

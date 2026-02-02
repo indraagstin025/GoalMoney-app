@@ -9,6 +9,8 @@ import '../../core/validators.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'register_screen.dart';
 
+/// Layar Login untuk autentikasi pengguna.
+/// Memungkinkan pengguna masuk menggunakan email dan password.
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,7 +28,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Safety clear to ensure no leftover data from previous session
+    // Safety clear: Membersihkan state provider untuk memastikan tidak ada data sisa dari sesi sebelumnya.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         context.read<GoalProvider>().clear();
@@ -43,6 +45,8 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Menangani proses submit form login.
+  /// Melakukan validasi, memanggil AuthProvider untuk login, dan menavigasi ke Dashboard jika sukses.
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -54,8 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ).login(_emailCtrl.text, _passCtrl.text);
 
       if (mounted) {
-        // Safety: Manual navigation to Dashboard after success,
-        // useful if LoginScreen was pushed on top of another screen.
+        // Navigasi ke Dashboard dan hapus semua rute sebelumnya (seperti Login/Onboarding).
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const DashboardScreen()),
           (route) => false,
@@ -63,9 +66,17 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
+        // Membersihkan pesan error dari exception agar lebih user-friendly.
+        String errorMessage = e.toString();
+        if (errorMessage.startsWith('Exception: ')) {
+          errorMessage = errorMessage.substring(
+            11,
+          ); // Hapus prefix "Exception: "
+        }
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login gagal: ${e.toString()}'),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
             behavior: SnackBarBehavior.floating,
           ),
@@ -85,10 +96,10 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header like Dashboard
+            // Header Kustom (Logo dan Theme Toggle)
             _buildCustomHeader(context, isDarkMode),
 
-            // Main Content
+            // Konten Utama Form Login
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24.0),
@@ -99,7 +110,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     children: [
                       const SizedBox(height: 20),
 
-                      // Welcome Text
+                      // Teks Sambutan
                       Text(
                         'Selamat Datang! 👋',
                         style: TextStyle(
@@ -120,7 +131,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 40),
 
-                      // Email Field
+                      // Input Field Email
                       Text(
                         'Email',
                         style: TextStyle(
@@ -171,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Password Field
+                      // Input Field Password
                       Text(
                         'Password',
                         style: TextStyle(
@@ -235,7 +246,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Login Button
+                      // Tombol Login
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -301,7 +312,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 24),
 
-                      // Register Link
+                      // Link ke Halaman Register
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -347,6 +358,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// Membangun header kustom dengan logo aplikasi dan tombol tema.
   Widget _buildCustomHeader(BuildContext context, bool isDarkMode) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -354,7 +366,7 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GoalMoney Logo
+          // Logo & Nama Aplikasi
           Row(
             children: [
               Container(
@@ -386,7 +398,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ],
           ),
 
-          // Theme Toggle
+          // Tombol Ganti Tema
           IconButton(
             icon: Icon(
               isDarkMode ? Icons.light_mode_rounded : Icons.dark_mode_rounded,

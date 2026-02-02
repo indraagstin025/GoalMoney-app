@@ -3,14 +3,21 @@ import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../models/transaction.dart';
 
+/// Provider untuk mengelola state dan data transaksi tabungan.
 class TransactionProvider with ChangeNotifier {
+  /// Instance ApiClient untuk melakukan request ke API transaksi.
   final ApiClient _apiClient = ApiClient();
+
+  /// Daftar transaksi untuk goal yang sedang dilihat.
   List<Transaction> _transactions = [];
+
+  /// Status loading saat mengambil data transaksi.
   bool _isLoading = false;
 
   List<Transaction> get transactions => _transactions;
   bool get isLoading => _isLoading;
 
+  /// Mengambil riwayat transaksi untuk sebuah goal berdasarkan ID.
   Future<void> fetchTransactions(int goalId) async {
     _isLoading = true;
     notifyListeners();
@@ -24,7 +31,7 @@ class TransactionProvider with ChangeNotifier {
         _transactions = data.map((json) => Transaction.fromJson(json)).toList();
       }
     } on DioException catch (e) {
-      print('Error fetching transactions: ${e.message}');
+      print('Gagal mengambil data transaksi: ${e.message}');
       _transactions = [];
     } finally {
       _isLoading = false;
@@ -32,6 +39,7 @@ class TransactionProvider with ChangeNotifier {
     }
   }
 
+  /// Menambahkan transaksi (setoran) baru ke sebuah goal.
   Future<void> addTransaction({
     required int goalId,
     required double amount,
@@ -48,15 +56,17 @@ class TransactionProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
+        // Segarkan daftar transaksi setelah berhasil menambah data.
         await fetchTransactions(goalId);
       }
     } on DioException catch (e) {
       throw Exception(
-        e.response?.data['message'] ?? 'Failed to add transaction',
+        e.response?.data['message'] ?? 'Gagal menambahkan transaksi',
       );
     }
   }
 
+  /// Menghapus transaksi berdasarkan ID.
   Future<void> deleteTransaction(int id, int goalId) async {
     try {
       await _apiClient.dio.delete('/transactions/delete', data: {'id': id});
@@ -64,12 +74,12 @@ class TransactionProvider with ChangeNotifier {
       notifyListeners();
     } on DioException catch (e) {
       throw Exception(
-        e.response?.data['message'] ?? 'Failed to delete transaction',
+        e.response?.data['message'] ?? 'Gagal menghapus transaksi',
       );
     }
   }
 
-  /// Clear all data (on logout)
+  /// Membersihkan seluruh data transaksi (saat logout).
   void clear() {
     _transactions = [];
     _isLoading = false;

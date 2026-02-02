@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'auth/login_screen.dart';
 import 'dashboard/dashboard_screen.dart';
 
+/// Layar Onboarding yang menampilkan pengenalan fitur aplikasi kepada pengguna baru.
+/// Terdiri dari beberapa halaman slide yang dapat digeser.
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
 
@@ -16,56 +18,69 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
+  // Data konten onboarding (Judul, Deskripsi, Ikon, Warna).
   final List<Map<String, dynamic>> _pages = [
     {
       'title': 'Selamat Datang di GoalMoney',
-      'description': 'Aplikasi manajemen tabungan impianmu. Mulai atur keuangan dengan lebih mudah dan terstruktur.',
+      'description':
+          'Aplikasi manajemen tabungan impianmu. Mulai atur keuangan dengan lebih mudah dan terstruktur.',
       'icon': Icons.savings_rounded,
       'color': Colors.green,
     },
     {
       'title': 'Pantau Progressmu',
-      'description': 'Lihat perkembangan tabunganmu secara real-time. Dapatkan notifikasi dan badge pencapaian.',
+      'description':
+          'Lihat perkembangan tabunganmu secara real-time. Dapatkan notifikasi dan badge pencapaian.',
       'icon': Icons.trending_up_rounded,
       'color': Colors.blue,
     },
     {
       'title': 'Wujudkan Impian',
-      'description': 'Capai targetmu tepat waktu. Tarik dananya dengan mudah ke E-Wallet atau Rekening Bank.',
+      'description':
+          'Capai targetmu tepat waktu. Tarik dananya dengan mudah ke E-Wallet atau Rekening Bank.',
       'icon': Icons.emoji_events_rounded,
       'color': Colors.orange,
     },
   ];
 
+  /// Menangani aksi tombol "Lanjut" atau "Mulai Sekarang".
   void _onNext() {
     if (_currentPage < _pages.length - 1) {
+      // Pindah ke halaman berikutnya dengan animasi.
       _pageController.nextPage(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
       );
     } else {
+      // Selesai onboarding, simpan status dan navigasi ke Login.
       _finishOnboarding();
     }
   }
 
+  /// Menyelesaikan proses onboarding.
+  /// Menyimpan flag 'has_seen_onboarding' ke SharedPreferences agar layar ini tidak muncul lagi.
   Future<void> _finishOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('has_seen_onboarding', true);
 
     if (!mounted) return;
-    
-    Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
-    );
+
+    // Arahkan ke Layar Login dan hapus navigasi sebelumnya (replace).
+    Navigator.of(
+      context,
+    ).pushReplacement(MaterialPageRoute(builder: (_) => const LoginScreen()));
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDarkMode = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
+            // Area Konten Slide (PageView)
             Expanded(
               child: PageView.builder(
                 controller: _pageController,
@@ -78,6 +93,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        // Ikon Fitur dengan Background Lingkaran
                         Container(
                           padding: const EdgeInsets.all(24),
                           decoration: BoxDecoration(
@@ -91,22 +107,26 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                         ),
                         const SizedBox(height: 32),
+                        // Judul
                         Text(
                           page['title'] as String,
                           textAlign: TextAlign.center,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
-                            color: Colors.black87,
+                            color: isDarkMode ? Colors.white : Colors.black87,
                           ),
                         ),
                         const SizedBox(height: 16),
+                        // Deskripsi
                         Text(
                           page['description'] as String,
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 16,
-                            color: Colors.grey[600],
+                            color: isDarkMode
+                                ? Colors.grey[400]
+                                : Colors.grey[600],
                             height: 1.5,
                           ),
                         ),
@@ -116,12 +136,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 },
               ),
             ),
+
+            // Area Kontrol Bawah (Indikator & Tombol)
             Padding(
               padding: const EdgeInsets.all(24.0),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Indicators
+                  // Indikator Halaman (Titik-titik)
                   Row(
                     children: List.generate(
                       _pages.length,
@@ -129,21 +151,27 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         duration: const Duration(milliseconds: 300),
                         margin: const EdgeInsets.only(right: 8),
                         height: 8,
-                        width: _currentPage == index ? 24 : 8,
+                        width: _currentPage == index
+                            ? 24
+                            : 8, // Lebarkan jika aktif
                         decoration: BoxDecoration(
                           color: _currentPage == index
                               ? Colors.green.shade600
-                              : Colors.grey.shade300,
+                              : (isDarkMode
+                                    ? Colors.grey[700]
+                                    : Colors.grey.shade300),
                           borderRadius: BorderRadius.circular(4),
                         ),
                       ),
                     ),
                   ),
-                  // Button
+
+                  // Tombol Lanjut / Mulai
                   ElevatedButton(
                     onPressed: _onNext,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.green.shade600,
+                      foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -153,11 +181,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       ),
                     ),
                     child: Text(
-                      _currentPage == _pages.length - 1 ? 'Mulai Sekarang' : 'Lanjut',
+                      _currentPage == _pages.length - 1
+                          ? 'Mulai Sekarang'
+                          : 'Lanjut',
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: Colors.white,
                       ),
                     ),
                   ),

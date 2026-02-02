@@ -8,10 +8,13 @@ import '../providers/badge_provider.dart';
 import '../widgets/badge_celebration_dialog.dart';
 import '../screens/withdrawals/withdrawal_screen.dart';
 
+/// Dialog untuk mengalokasikan sisa dana (overflow) saat sebuah target goal tercapai.
+/// Memungkinkan pengguna untuk membagi kelebihan uang ke goal lain yang belum selesai
+/// atau menyimpannya ke saldo akun (tersedia untuk ditarik atau digunakan nanti).
 class OverflowAllocationDialog extends StatefulWidget {
-  final double overflowAmount;
-  final String completedGoalName;
-  final String? sourceMethod; // Add sourceMethod
+  final double overflowAmount; // Jumlah uang sisa yang perlu dialokasikan
+  final String completedGoalName; // Nama goal yang baru saja selesai
+  final String? sourceMethod; // Metode sumber dana (manual/tunai atau digital)
 
   const OverflowAllocationDialog({
     Key? key,
@@ -32,12 +35,14 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
     decimalDigits: 0,
   );
 
-  List<Goal> availableGoals = [];
-  Map<int, TextEditingController> controllers = {};
-  double remainingOverflow = 0;
-  bool isLoading = true;
-  bool isSubmitting = false;
-  bool hasIncompatibleGoals = false; // Track if we filtered out goals
+  List<Goal> availableGoals = []; // Daftar goal yang bisa menerima alokasi
+  Map<int, TextEditingController> controllers =
+      {}; // Controller untuk input jumlah alokasi per goal
+  double remainingOverflow = 0; // Sisa overflow yang belum dialokasikan di UI
+  bool isLoading = true; // Status loading data goal
+  bool isSubmitting = false; // Status saat proses pengiriman alokasi
+  bool hasIncompatibleGoals =
+      false; // Menandai jika ada goal yang difilter karena perbedaan tipe
 
   @override
   void initState() {
@@ -46,31 +51,32 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
     _loadAvailableGoals();
   }
 
+  /// Memuat daftar goal yang tersedia untuk menerima alokasi.
+  /// Memfilter goal berdasarkan tipe yang sama dengan sumber dana (Tunai atau Digital).
   Future<void> _loadAvailableGoals() async {
     try {
       final goalProvider = Provider.of<GoalProvider>(context, listen: false);
 
-      // Check if there are ANY incomplete goals before filtering
+      // Ambil semua goal yang belum mencapai target
       final allIncomplete = goalProvider.goals
           .where((g) => g.currentAmount < g.targetAmount)
           .toList();
 
-      // Filter goals by TYPE
+      // Filter goal berdasarkan tipe (Cash ke Cash, Digital ke Digital)
       availableGoals = allIncomplete.where((g) {
-        // Must match source type (Cash for Cash, Digital for Digital)
         final isSourceCash = widget.sourceMethod == 'manual';
         final isGoalCash = g.type == 'cash';
         return isSourceCash == isGoalCash;
       }).toList();
 
-      // If we had incomplete goals but availableGoals is empty, it means they were incompatible
+      // Jika ada goal belum selesai tapi tipenya tidak cocok
       if (allIncomplete.isNotEmpty && availableGoals.isEmpty) {
         hasIncompatibleGoals = true;
       } else {
         hasIncompatibleGoals = false;
       }
 
-      // Initialize controllers
+      // Inisialisasi controller untuk setiap goal yang tersedia
       for (var goal in availableGoals) {
         controllers[goal.id] = TextEditingController();
       }
@@ -93,6 +99,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
     }
   }
 
+  /// Menghitung sisa overflow secara real-time berdasarkan input di setiap textfield.
   void _calculateRemaining() {
     double total = 0;
     for (var controller in controllers.values) {
@@ -105,13 +112,14 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
     });
   }
 
+  /// Mengirim alokasi dana yang telah diinput ke server.
   Future<void> _submitAllocation() async {
     if (isSubmitting) return;
 
     try {
       setState(() => isSubmitting = true);
 
-      // Build allocations array
+      // Siapkan array alokasi untuk dikirim ke API
       List<Map<String, dynamic>> allocations = [];
 
       for (var goal in availableGoals) {
@@ -120,7 +128,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
         final amount = double.tryParse(text) ?? 0;
 
         if (amount > 0) {
-          // Validate tidak melebihi remaining target
+          // Validasi agar tidak melebihi sisa target goal tersebut
           final remaining = goal.targetAmount - goal.currentAmount;
           if (amount > remaining) {
             throw Exception(
@@ -132,19 +140,21 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
         }
       }
 
+      // Pastikan ada setidaknya satu alokasi atau dana disimpan ke balance
       if (allocations.isEmpty && remainingOverflow == widget.overflowAmount) {
         throw Exception(
           'Silakan alokasikan minimal ke satu goal atau simpan sebagai balance',
         );
       }
 
-      // Call allocation endpoint
+      // Panggil provider untuk menyimpan alokasi overflow
       final goalProvider = Provider.of<GoalProvider>(context, listen: false);
       final response = await goalProvider.allocateOverflow(
         allocations: allocations,
         saveToBalanceAmount: remainingOverflow > 0 ? remainingOverflow : null,
       );
 
+      // Update saldo akun jika ada kembalian saldo
       if (mounted && response['available_balance'] != null) {
         final newBalance = (response['available_balance'] is num)
             ? (response['available_balance'] as num).toDouble()
@@ -156,7 +166,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
       }
 
       if (mounted) {
-        // --- NEW: Trigger Badge Check ---
+        // Cek apakah ada badge baru yang didapat setelah alokasi ini
         try {
           final badgeProvider = Provider.of<BadgeProvider>(
             context,
@@ -175,7 +185,6 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
         } catch (e) {
           debugPrint('[OverflowDialog] Badge check error: $e');
         }
-        // -------------------------------
 
         if (mounted) {
           Navigator.pop(context);
@@ -205,12 +214,12 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
     }
   }
 
-  /// Handle quick action for save to balance or withdraw
+  /// Menangani aksi cepat (Quick Action) seperti simpan semua ke balance atau tarik tunai.
   Future<void> _handleQuickAction({required bool toBalance}) async {
     if (isSubmitting) return;
 
     if (toBalance) {
-      // Save all remaining to balance
+      // Simpan semua sisa overflow ke saldo akun (Available Balance)
       setState(() => isSubmitting = true);
       try {
         final response = await Provider.of<GoalProvider>(context, listen: false)
@@ -239,7 +248,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
             ),
           );
 
-          // --- NEW: Trigger Badge Check ---
+          // Cek badge baru
           try {
             final badgeProvider = Provider.of<BadgeProvider>(
               context,
@@ -253,7 +262,6 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
           } catch (e) {
             print('[OverflowDialog] Badge check error: $e');
           }
-          // -------------------------------
 
           Navigator.of(context).pop();
         }
@@ -271,9 +279,9 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
         if (mounted) setState(() => isSubmitting = false);
       }
     } else {
-      // Withdraw - depends on source method
+      // Tarik Dana - Logika berbeda untuk Tunai (Manual) dan Digital
       if (widget.sourceMethod == 'manual') {
-        // Manual cash - ambil tunai langsung
+        // Untuk Tunai: Langsung tandai sebagai diambil tunai (Request Manual Withdrawal)
         setState(() => isSubmitting = true);
         try {
           await Provider.of<GoalProvider>(
@@ -314,7 +322,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
           if (mounted) setState(() => isSubmitting = false);
         }
       } else {
-        // Digital - navigate to withdrawal screen
+        // Untuk Digital: Simpan ke balance dulu lalu navigasi ke layar penarikan
         setState(() => isSubmitting = true);
         try {
           final response =
@@ -763,6 +771,7 @@ class _OverflowAllocationDialogState extends State<OverflowAllocationDialog> {
   }
 }
 
+/// Widget item untuk menginput alokasi dana ke goal tertentu.
 class AllocationGoalItem extends StatelessWidget {
   final Goal goal;
   final TextEditingController controller;
@@ -851,6 +860,7 @@ class AllocationGoalItem extends StatelessWidget {
   }
 }
 
+/// Bagian ringkasan yang menampilkan sisa overflow yang belum dialokasikan.
 class _SummarySection extends StatelessWidget {
   final double remainingOverflow;
   final bool isDarkMode;
@@ -964,6 +974,7 @@ class _SummarySection extends StatelessWidget {
   }
 }
 
+/// Tampilan khusus jika semua goal sudah tercapai atau tidak ada yang kompatibel.
 class _AllGoalsCompletedView extends StatelessWidget {
   final double overflowAmount;
   final bool isDarkMode;
@@ -991,7 +1002,7 @@ class _AllGoalsCompletedView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Success Banner - Improved contrast
+            // Banner Selamat (Success)
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1030,7 +1041,7 @@ class _AllGoalsCompletedView extends StatelessWidget {
               ),
             ),
 
-            // Warning if incompatible goals exist
+            // Peringatan jika ada goal lain tapi beda tipe (Tunai vs Digital)
             if (hasIncompatibleGoals)
               Container(
                 margin: const EdgeInsets.only(top: 16),
@@ -1102,7 +1113,7 @@ class _AllGoalsCompletedView extends StatelessWidget {
             ),
             const SizedBox(height: 12),
 
-            // Option 1: Save as Balance (Only if NOT manual)
+            // Opsi 1: Simpan ke Saldo Akun (Hanya untuk non-tunai)
             if (sourceMethod != 'manual')
               InkWell(
                 onTap: () => onSubmit(true),
@@ -1180,7 +1191,7 @@ class _AllGoalsCompletedView extends StatelessWidget {
               ),
             if (sourceMethod != 'manual') const SizedBox(height: 12),
 
-            // Option 2: Withdraw to E-Wallet / Tarik Dana
+            // Opsi 2: Tarik Dana / Ambil Tunai
             InkWell(
               onTap: () => onSubmit(false),
               borderRadius: BorderRadius.circular(12),
@@ -1297,7 +1308,7 @@ class _AllGoalsCompletedView extends StatelessWidget {
   }
 }
 
-/// Compact action button for quick actions
+/// Tombol aksi cepat (compact).
 class _QuickActionButton extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1379,7 +1390,7 @@ class _QuickActionButton extends StatelessWidget {
   }
 }
 
-// Helper function to show dialog
+/// Fungsi helper untuk menampilkan Dialog Alokasi Overflow.
 void showOverflowAllocationDialog({
   required BuildContext context,
   required double overflowAmount,

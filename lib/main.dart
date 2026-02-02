@@ -12,8 +12,10 @@ import 'config/theme.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
+/// Global key untuk navigator, memungkinkan navigasi tanpa context.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
+/// Titik masuk utama aplikasi GoalMoney.
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
@@ -32,6 +34,8 @@ void main() async {
   );
 }
 
+/// Widget root aplikasi.
+/// Mengatur tema dan routing awal.
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
@@ -46,7 +50,7 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
-          // Start with Splash Screen which handles the routing logic
+          // Mulai dengan SplashScreen yang menangani logika routing
           home: const SplashScreen(),
         );
       },

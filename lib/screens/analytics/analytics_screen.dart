@@ -7,6 +7,8 @@ import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
 import 'streak_calendar_screen.dart';
 
+/// Layar Dashboard Analitik yang menampilkan statistik tabungan dalam bentuk grafik.
+/// Menggunakan paket `fl_chart` untuk visualisasi data tren, progress, dan distribusi.
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
 
@@ -15,21 +17,32 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
+  /// Instance ApiClient untuk mengambil data analitik dari backend.
   final ApiClient _apiClient = ApiClient();
+
+  /// Tahun yang dipilih untuk filter data statistik.
   int _selectedYear = DateTime.now().year;
 
+  /// Data analitik mentah yang diterima dari API.
   Map<String, dynamic>? _analyticsData;
+
+  /// Data rekomendasi strategi menabung.
   Map<String, dynamic>? _recommendationData;
+
+  /// Status loading selama pengambilan data.
   bool _isLoading = true;
+
+  /// Pesan error jika terjadi kegagalan pengambilan data.
   String? _error;
 
+  /// Formatter mata uang Rupiah untuk tampilan nominal.
   final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
     decimalDigits: 0,
   );
 
-  // Helper to safely convert API values (String/num) to num
+  /// Helper untuk mengonversi nilai dari API secara aman menjadi tipe [num].
   num _toNum(dynamic value) {
     if (value == null) return 0;
     if (value is num) return value;
@@ -90,75 +103,145 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Analytics'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StreakCalendarScreen()),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Branded Header
+            _buildCustomHeader(context, isDark),
+
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _error != null
+                  ? Center(child: Text('Error: $_error'))
+                  : RefreshIndicator(
+                      onRefresh: _loadData,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Summary Stats
+                            _buildSummaryStats(isDark),
+                            const SizedBox(height: 24),
+
+                            // Year Selector
+                            _buildYearSelector(),
+                            const SizedBox(height: 16),
+
+                            // Monthly Trend Line Chart
+                            _buildSectionTitle('📈 Tren Tabungan Bulanan'),
+                            const SizedBox(height: 8),
+                            _buildLineChart(isDark),
+                            const SizedBox(height: 24),
+
+                            // Savings Goals Progress
+                            _buildSectionTitle('🎯 Progress Goal'),
+                            const SizedBox(height: 8),
+                            _buildBarChart(isDark),
+                            const SizedBox(height: 24),
+
+                            // Goal Category Distribution (Pie Chart)
+                            _buildSectionTitle('📊 Distribusi Kategori Goal'),
+                            const SizedBox(height: 8),
+                            _buildPieChart(isDark),
+                            const SizedBox(height: 24),
+
+                            // Top Recommendations (AI-driven simple logic)
+                            _buildSectionTitle('✨ Rekomendasi Strategi'),
+                            const SizedBox(height: 8),
+                            _buildRecommendations(isDark),
+                          ],
+                        ),
+                      ),
+                    ),
             ),
-            tooltip: 'Streak Calendar',
-          ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData),
-        ],
+          ],
+        ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _error != null
-          ? Center(child: Text('Error: $_error'))
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Summary Stats
-                    _buildSummaryStats(isDark),
-                    const SizedBox(height: 24),
-
-                    // Year Selector
-                    _buildYearSelector(),
-                    const SizedBox(height: 16),
-
-                    // Monthly Trend Line Chart
-                    _buildSectionTitle('📈 Tren Tabungan Bulanan'),
-                    const SizedBox(height: 12),
-                    _buildLineChart(isDark),
-                    const SizedBox(height: 24),
-
-                    // Goal Progress Bar Chart
-                    _buildSectionTitle('🎯 Progress Goal'),
-                    const SizedBox(height: 12),
-                    _buildBarChart(isDark),
-                    const SizedBox(height: 24),
-
-                    // Category Distribution Pie Chart
-                    _buildSectionTitle('📊 Distribusi Kategori Goal'),
-                    const SizedBox(height: 12),
-                    _buildPieChart(isDark),
-                    const SizedBox(height: 24),
-
-                    // Recommendations
-                    if (_recommendationData != null &&
-                        (_recommendationData!['count'] ?? 0) > 0) ...[
-                      _buildSectionTitle('🤖 Smart Recommendations'),
-                      const SizedBox(height: 12),
-                      _buildRecommendations(isDark),
-                    ],
-                  ],
-                ),
-              ),
-            ),
     );
   }
 
+  /// Membangun header kustom dengan logo dan tombol navigasi.
+  Widget _buildCustomHeader(BuildContext context, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Theme.of(context).cardTheme.color,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // GoalMoney Logo
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade700, Colors.green.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.savings_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'GoalMoney',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.lightGreen,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+
+          // Actions
+          Row(
+            children: [
+              IconButton(
+                icon: Icon(
+                  Icons.calendar_month,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const StreakCalendarScreen(),
+                  ),
+                ),
+                tooltip: 'Streak Calendar',
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.refresh,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                onPressed: _loadData,
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Membangun kartu ringkasan statistik (Total tabungan, Progress, dll).
   Widget _buildSummaryStats(bool isDark) {
     final summary = _analyticsData?['summary'] ?? {};
 
@@ -222,6 +305,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Membangun item statistik individu dengan ikon emoji.
   Widget _buildStatItem(String emoji, String value, String label) {
     return Column(
       children: [
@@ -243,6 +327,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Membangun kontrol pemilih tahun (Lalu/Selanjutnya).
   Widget _buildYearSelector() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
@@ -271,6 +356,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Membangun teks judul untuk setiap bagian analitik.
   Widget _buildSectionTitle(String title) {
     return Text(
       title,
@@ -278,6 +364,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Membangun grafik garis (Line Chart) untuk tren tabungan bulanan.
   Widget _buildLineChart(bool isDark) {
     final monthlyTrend = _analyticsData?['monthly_trend'] as List? ?? [];
 
@@ -321,7 +408,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   if (value == 0) return const Text('');
                   return Text(
                     _formatCompact(value),
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? Colors.grey.shade400 : Colors.black87,
+                    ),
                   );
                 },
               ),
@@ -334,7 +424,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     return const Text('');
                   return Text(
                     monthlyTrend[value.toInt()]['month_short'] ?? '',
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? Colors.grey.shade400 : Colors.black87,
+                    ),
                   );
                 },
               ),
@@ -383,6 +476,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Membangun grafik batang (Bar Chart) untuk perbandingan progress antar goal.
   Widget _buildBarChart(bool isDark) {
     final goalComparison = _analyticsData?['goal_comparison'] as List? ?? [];
 
@@ -436,7 +530,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   if (value % 25 != 0) return const Text('');
                   return Text(
                     '${value.toInt()}%',
-                    style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isDark ? Colors.grey.shade400 : Colors.black87,
+                    ),
                   );
                 },
               ),
@@ -451,7 +548,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     padding: const EdgeInsets.only(top: 8),
                     child: Text(
                       goalComparison[value.toInt()]['name'] ?? '',
-                      style: TextStyle(fontSize: 8, color: Colors.grey[600]),
+                      style: TextStyle(
+                        fontSize: 8,
+                        color: isDark ? Colors.grey.shade400 : Colors.black87,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -490,18 +590,22 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Membangun grafik lingkaran (Pie Chart) berdasarkan kategori goal.
   Widget _buildPieChart(bool isDark) {
     final categories = _analyticsData?['category_distribution'] as List? ?? [];
 
-    final activeCategories = categories
-        .where((c) => (c['count'] as int?) != null && (c['count'] as int) > 0)
-        .toList();
-
-    if (activeCategories.isEmpty) {
-      return _buildEmptyChart('Belum ada goal', isDark);
+    if (categories.isEmpty) {
+      return _buildEmptyChart('Belum ada data distribusi', isDark);
     }
 
-    final colors = [Colors.blue, Colors.orange, Colors.purple, Colors.teal];
+    final colors = [
+      Colors.blue,
+      Colors.orange,
+      Colors.purple,
+      Colors.teal,
+      Colors.pink,
+      Colors.amber,
+    ];
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -523,8 +627,8 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             width: 150,
             child: PieChart(
               PieChartData(
-                sections: List.generate(activeCategories.length, (i) {
-                  final cat = activeCategories[i];
+                sections: List.generate(categories.length, (i) {
+                  final cat = categories[i];
                   return PieChartSectionData(
                     value: (cat['count'] as num).toDouble(),
                     color: colors[i % colors.length],
@@ -546,9 +650,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: List.generate(activeCategories.length, (i) {
-                final cat = activeCategories[i];
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(categories.length, (i) {
+                final cat = categories[i];
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
@@ -567,17 +671,20 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           cat['label'] ?? '',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: isDark ? Colors.grey[300] : Colors.grey[600],
                           ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
                         _formatCompact(
                           (cat['total_saved'] as num?)?.toDouble() ?? 0,
                         ),
-                        style: const TextStyle(
-                          fontSize: 12,
+                        style: TextStyle(
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
+                          color: isDark ? Colors.white70 : Colors.black87,
                         ),
                       ),
                     ],
@@ -591,6 +698,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Membangun bagian rekomendasi strategi menabung pintar.
   Widget _buildRecommendations(bool isDark) {
     final recommendations =
         _recommendationData?['recommendations'] as List? ?? [];
@@ -659,7 +767,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                           'Saran: ${currencyFormatter.format(_toNum(rec['daily_suggestion']))}/hari',
                           style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey[600],
+                            color: isDark
+                                ? Colors.grey.shade400
+                                : Colors.black87,
                           ),
                         ),
                       ],
@@ -693,6 +803,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
+  /// Menampilkan tampilan placeholder jika data grafik kosong.
   Widget _buildEmptyChart(String message, bool isDark) {
     return Container(
       height: 150,
@@ -702,7 +813,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Center(
-        child: Text(message, style: TextStyle(color: Colors.grey[600])),
+        child: Text(
+          message,
+          style: TextStyle(
+            color: isDark ? Colors.grey.shade400 : Colors.black87,
+          ),
+        ),
       ),
     );
   }

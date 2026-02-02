@@ -10,7 +10,10 @@ import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
 import '../models/report.dart';
 
+/// Service untuk mengekspor laporan keuangan ke berbagai format (PDF, Excel, CSV).
+/// Menggunakan paket `pdf` untuk PDF, `excel` untuk Excel, dan `path_provider` untuk manajemen file.
 class ReportExportService {
+  /// Formatter mata uang untuk format Rupiah Indonesia.
   static final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
@@ -19,10 +22,12 @@ class ReportExportService {
 
   // ===== PDF EXPORT =====
 
+  /// Mengekspor objek [SavingsReport] ke file PDF.
+  /// Mencakup header, ringkasan, daftar goal, pencapaian, badge, tips, dan riwayat transaksi.
   static Future<File> exportToPdf(SavingsReport report) async {
     final pdf = pw.Document();
 
-    // Add pages
+    // Tambahkan halaman multi-page yang mendukung konten panjang.
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
@@ -511,6 +516,8 @@ class ReportExportService {
 
   // ===== EXCEL EXPORT =====
 
+  /// Mengekspor objek [SavingsReport] ke file Excel.
+  /// Membuat beberapa sheet untuk ringkasan, detail goal, tren bulanan, transaksi, dan badge.
   static Future<File> exportToExcel(SavingsReport report) async {
     final excel = Excel.createExcel();
 
@@ -552,6 +559,7 @@ class ReportExportService {
     return file;
   }
 
+  /// Membuat sheet ringkasan pada file Excel.
   static void _createSummarySheet(Excel excel, SavingsReport report) {
     final sheet = excel['Ringkasan'];
 
@@ -1070,6 +1078,8 @@ class ReportExportService {
     );
   }
 
+  /// Mengekspor objek [SavingsReport] ke format CSV.
+  /// Cocok untuk pemrosesan data sederhana atau diimpor ke aplikasi lain.
   static Future<File> exportToCsv(SavingsReport report) async {
     final StringBuffer buffer = StringBuffer();
 
@@ -1110,6 +1120,7 @@ class ReportExportService {
 
   // ===== UTILITY =====
 
+  /// Membuka file menggunakan aplikasi default sistem (misal PDF viewer atau Excel).
   static Future<void> openFile(File file) async {
     await OpenFile.open(file.path);
   }

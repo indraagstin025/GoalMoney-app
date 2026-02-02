@@ -11,6 +11,9 @@ import '../../providers/goal_provider.dart';
 import '../../models/report.dart';
 import '../../services/report_export_service.dart';
 
+/// Layar Laporan Tabungan yang menyajikan data statistik mendalam tentang progress user.
+/// Memungkinkan user untuk memfilter laporan berdasarkan periode (hari, minggu, bulan, tahun, atau kustom).
+/// User juga dapat mengekspor laporan ke format PDF, Excel, atau CSV.
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
@@ -19,16 +22,26 @@ class ReportScreen extends StatefulWidget {
 }
 
 class _ReportScreenState extends State<ReportScreen> {
+  /// Formatter mata uang Rupiah.
   final currencyFormatter = NumberFormat.currency(
     locale: 'id_ID',
     symbol: 'Rp ',
     decimalDigits: 0,
   );
 
+  /// Status apakah proses ekspor sedang berjalan.
   bool _isExporting = false;
+
+  /// Kontroler input pencarian goal.
   final TextEditingController _searchCtrl = TextEditingController();
-  String _selectedFilter = 'Bulan Ini'; // Default filter
+
+  /// Filter periode yang dipilih (Default: Bulan Ini).
+  String _selectedFilter = 'Bulan Ini';
+
+  /// Tanggal awal untuk filter kustom.
   DateTime? _customStartDate;
+
+  /// Tanggal akhir untuk filter kustom.
   DateTime? _customEndDate;
 
   @override
@@ -39,6 +52,7 @@ class _ReportScreenState extends State<ReportScreen> {
     });
   }
 
+  /// Menerapkan filter periode yang dipilih dan menerjemahkannya ke rentang tanggal.
   void _applyFilter(String filter) {
     setState(() => _selectedFilter = filter);
 
@@ -69,6 +83,7 @@ class _ReportScreenState extends State<ReportScreen> {
     _loadReport(startDate: startStr, endDate: endStr);
   }
 
+  /// Mengambil data laporan dari server melalui [GoalProvider].
   Future<void> _loadReport({String? startDate, String? endDate}) async {
     try {
       await context.read<GoalProvider>().fetchReport(
@@ -88,6 +103,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  /// Membuat teks ringkasan laporan untuk dibagikan secara teks ke aplikasi lain.
   String _generateShareText(SavingsReport report) {
     final buffer = StringBuffer();
 
@@ -144,6 +160,7 @@ class _ReportScreenState extends State<ReportScreen> {
     super.dispose();
   }
 
+  /// Menampilkan pemilih rentang tanggal kustom (Date Range Picker).
   void _showCustomRangePicker() async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -176,6 +193,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  /// Membangun bar pencarian dan baris chip filter periode.
   Widget _buildFilterAndSearch(bool isDark) {
     return Column(
       children: [
@@ -236,8 +254,11 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
+  /// Helper untuk membangun satu chip filter periode.
   Widget _buildFilterChip(String label, {IconData? icon}) {
     final isSelected = _selectedFilter == label;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return ChoiceChip(
       label: Row(
         mainAxisSize: MainAxisSize.min,
@@ -265,20 +286,32 @@ class _ReportScreenState extends State<ReportScreen> {
       },
       selectedColor: Colors.green,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : Colors.black87,
+        color: isSelected
+            ? Colors.white
+            : isDark
+            ? Colors.white
+            : Colors.black87,
         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
       ),
-      backgroundColor: Colors.white,
-      side: BorderSide(color: isSelected ? Colors.green : Colors.grey[300]!),
+      backgroundColor: isDark ? Colors.grey.shade800 : Colors.white,
+      side: BorderSide(
+        color: isSelected
+            ? Colors.green
+            : isDark
+            ? Colors.grey.shade700
+            : Colors.grey.shade300,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     );
   }
 
+  /// Membagikan laporan dalam bentuk teks ke media sosial atau pesan.
   void _shareReport(SavingsReport report) async {
     final shareText = _generateShareText(report);
     await Share.share(shareText, subject: report.reportTitle);
   }
 
+  /// Menyalin isi ringkasan laporan ke Clipboard sistem.
   void _copyReport(SavingsReport report) {
     final shareText = _generateShareText(report);
     Clipboard.setData(ClipboardData(text: shareText));
@@ -290,6 +323,7 @@ class _ReportScreenState extends State<ReportScreen> {
     );
   }
 
+  /// Mengekspor data laporan ke dalam file PDF.
   Future<void> _exportToPdf(SavingsReport report) async {
     if (_isExporting) return;
 
@@ -338,6 +372,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  /// Mengekspor data laporan ke dalam file Excel (.xlsx).
   Future<void> _exportToExcel(SavingsReport report) async {
     if (_isExporting) return;
 
@@ -386,6 +421,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  /// Mengekspor data laporan ke dalam format CSV.
   Future<void> _exportToCsv(SavingsReport report) async {
     if (_isExporting) return;
 
@@ -434,6 +470,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+  /// Menampilkan dialog sukses setelah file laporan berhasil dibuat.
   void _showExportSuccessDialog(String type, String filePath) {
     showDialog(
       context: context,
@@ -497,202 +534,284 @@ class _ReportScreenState extends State<ReportScreen> {
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Laporan Tabungan'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        actions: [
-          Consumer<GoalProvider>(
-            builder: (context, provider, _) {
-              if (provider.report != null) {
-                return PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert),
-                  onSelected: (value) {
-                    if (value == 'share') {
-                      _shareReport(provider.report!);
-                    } else if (value == 'copy') {
-                      _copyReport(provider.report!);
-                    } else if (value == 'pdf') {
-                      _exportToPdf(provider.report!);
-                    } else if (value == 'excel') {
-                      _exportToExcel(provider.report!);
-                    } else if (value == 'csv') {
-                      _exportToCsv(provider.report!);
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem(
-                      value: 'pdf',
-                      child: Row(
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Branded Header
+            _buildCustomHeader(context, isDark),
+
+            Expanded(
+              child: Consumer<GoalProvider>(
+                builder: (context, provider, _) {
+                  if (provider.isLoadingReport) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.picture_as_pdf, color: Colors.red),
-                          SizedBox(width: 8),
-                          Text('Cetak PDF'),
+                          CircularProgressIndicator(),
+                          SizedBox(height: 16),
+                          Text('Memuat laporan...'),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final report = provider.report;
+                  if (report == null) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.description_outlined,
+                            size: 64,
+                            color: Colors.grey[400],
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Belum ada laporan',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          ElevatedButton.icon(
+                            onPressed: _loadReport,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Muat Laporan'),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return RefreshIndicator(
+                    onRefresh: _loadReport,
+                    child: SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Filter & Search Section
+                          _buildFilterAndSearch(isDark),
+                          const SizedBox(height: 16),
+
+                          // Header Card
+                          _buildHeaderCard(report, isDark),
+                          const SizedBox(height: 16),
+
+                          // Summary Card
+                          _buildSummaryCard(report, isDark),
+                          const SizedBox(height: 16),
+
+                          // Goal Details
+                          if (report.goalDetails.isNotEmpty) ...[
+                            _buildSectionTitle('🎯 Detail Goal', Icons.flag),
+                            const SizedBox(height: 8),
+                            ...report.goalDetails.map(
+                              (goal) => _buildGoalCard(goal, isDark),
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Achievements
+                          if (report.achievements.isNotEmpty) ...[
+                            _buildSectionTitle(
+                              '🏆 Pencapaian',
+                              Icons.emoji_events,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildAchievementsCard(report.achievements, isDark),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Tips
+                          if (report.tips.isNotEmpty) ...[
+                            _buildSectionTitle(
+                              '💡 Tips Menabung',
+                              Icons.lightbulb,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildTipsCard(report.tips, isDark),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Monthly Breakdown
+                          if (report.monthlyBreakdown.isNotEmpty) ...[
+                            _buildSectionTitle(
+                              '📈 Tren Bulanan',
+                              Icons.trending_up,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildMonthlyBreakdownCard(
+                              report.monthlyBreakdown,
+                              isDark,
+                            ),
+                            const SizedBox(height: 16),
+                          ],
+
+                          // Transaction History Section
+                          if (report.transactions.isNotEmpty) ...[
+                            _buildSectionTitle(
+                              '📝 Riwayat Transaksi',
+                              Icons.history,
+                            ),
+                            const SizedBox(height: 8),
+                            _buildTransactionsCard(report.transactions, isDark),
+                            const SizedBox(height: 24),
+                          ],
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
-                      value: 'excel',
-                      child: Row(
-                        children: [
-                          Icon(Icons.table_chart, color: Colors.green),
-                          SizedBox(width: 8),
-                          Text('Cetak Excel'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'csv',
-                      child: Row(
-                        children: [
-                          Icon(Icons.description, color: Colors.blue),
-                          SizedBox(width: 8),
-                          Text('Cetak CSV'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuDivider(),
-                    const PopupMenuItem(
-                      value: 'share',
-                      child: Row(
-                        children: [
-                          Icon(Icons.share),
-                          SizedBox(width: 8),
-                          Text('Bagikan Laporan'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuItem(
-                      value: 'copy',
-                      child: Row(
-                        children: [
-                          Icon(Icons.copy),
-                          SizedBox(width: 8),
-                          Text('Salin Laporan'),
-                        ],
-                      ),
-                    ),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
-      ),
-      body: Consumer<GoalProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoadingReport) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Memuat laporan...'),
-                ],
-              ),
-            );
-          }
-
-          final report = provider.report;
-          if (report == null) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.description_outlined,
-                    size: 64,
-                    color: Colors.grey[400],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Belum ada laporan',
-                    style: TextStyle(fontSize: 18, color: Colors.grey[600]),
-                  ),
-                  const SizedBox(height: 24),
-                  ElevatedButton.icon(
-                    onPressed: _loadReport,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('Muat Laporan'),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          return RefreshIndicator(
-            onRefresh: _loadReport,
-            child: SingleChildScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Filter & Search Section
-                  _buildFilterAndSearch(isDark),
-                  const SizedBox(height: 16),
-
-                  // Header Card
-                  _buildHeaderCard(report, isDark),
-                  const SizedBox(height: 16),
-
-                  // Summary Card
-                  _buildSummaryCard(report, isDark),
-                  const SizedBox(height: 16),
-
-                  // Goal Details
-                  if (report.goalDetails.isNotEmpty) ...[
-                    _buildSectionTitle('Detail Goal', Icons.flag),
-                    const SizedBox(height: 8),
-                    ...report.goalDetails.map(
-                      (goal) => _buildGoalCard(goal, isDark),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Achievements
-                  if (report.achievements.isNotEmpty) ...[
-                    _buildSectionTitle('Pencapaian', Icons.emoji_events),
-                    const SizedBox(height: 8),
-                    _buildAchievementsCard(report.achievements, isDark),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Tips
-                  if (report.tips.isNotEmpty) ...[
-                    _buildSectionTitle('Tips Menabung', Icons.lightbulb),
-                    const SizedBox(height: 8),
-                    _buildTipsCard(report.tips, isDark),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Monthly Breakdown
-                  if (report.monthlyBreakdown.isNotEmpty) ...[
-                    _buildSectionTitle('Tren Bulanan', Icons.trending_up),
-                    const SizedBox(height: 8),
-                    _buildMonthlyBreakdownCard(report.monthlyBreakdown, isDark),
-                    const SizedBox(height: 16),
-                  ],
-
-                  // Transaction History Section
-                  if (report.transactions.isNotEmpty) ...[
-                    _buildSectionTitle('Riwayat Transaksi', Icons.history),
-                    const SizedBox(height: 8),
-                    _buildTransactionsCard(report.transactions, isDark),
-                    const SizedBox(height: 24),
-                  ],
-                ],
+                  );
+                },
               ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
 
+  /// Membangun header kustom dengan logo dan menu tindakan ekspor.
+  Widget _buildCustomHeader(BuildContext context, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Theme.of(context).cardTheme.color,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // GoalMoney Logo
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade700, Colors.green.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.savings_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'GoalMoney',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.lightGreen,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+
+          // Actions
+          Row(
+            children: [
+              Consumer<GoalProvider>(
+                builder: (context, provider, _) {
+                  if (provider.report != null) {
+                    return PopupMenuButton<String>(
+                      icon: Icon(
+                        Icons.more_vert,
+                        color: isDark ? Colors.white : Colors.black87,
+                      ),
+                      onSelected: (value) {
+                        if (value == 'share') {
+                          _shareReport(provider.report!);
+                        } else if (value == 'copy') {
+                          _copyReport(provider.report!);
+                        } else if (value == 'pdf') {
+                          _exportToPdf(provider.report!);
+                        } else if (value == 'excel') {
+                          _exportToExcel(provider.report!);
+                        } else if (value == 'csv') {
+                          _exportToCsv(provider.report!);
+                        }
+                      },
+                      itemBuilder: (context) => [
+                        const PopupMenuItem(
+                          value: 'pdf',
+                          child: Row(
+                            children: [
+                              Icon(Icons.picture_as_pdf, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text('Export ke PDF'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'excel',
+                          child: Row(
+                            children: [
+                              Icon(Icons.table_chart, color: Colors.green),
+                              SizedBox(width: 8),
+                              Text('Export ke Excel'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'csv',
+                          child: Row(
+                            children: [
+                              Icon(Icons.text_snippet, color: Colors.blue),
+                              SizedBox(width: 8),
+                              Text('Export ke CSV'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        const PopupMenuItem(
+                          value: 'share',
+                          child: Row(
+                            children: [
+                              Icon(Icons.share, color: Colors.indigo),
+                              SizedBox(width: 8),
+                              Text('Bagikan Laporan'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuItem(
+                          value: 'copy',
+                          child: Row(
+                            children: [
+                              Icon(Icons.copy, color: Colors.grey),
+                              SizedBox(width: 8),
+                              Text('Salin Teks'),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return const SizedBox.shrink();
+                },
+              ),
+              IconButton(
+                icon: Icon(
+                  Icons.arrow_back_rounded,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+                onPressed: () => Navigator.pop(context),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Membangun kartu header utama dengan informasi periode laporan.
   Widget _buildHeaderCard(SavingsReport report, bool isDark) {
     return Container(
       padding: const EdgeInsets.all(20),

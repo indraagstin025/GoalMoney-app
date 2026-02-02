@@ -4,18 +4,22 @@ import '../screens/notifications/notification_screen.dart';
 import '../main.dart';
 import 'local_notification_service.dart'; // Import Local Notification Service
 
+/// Layanan untuk mengelola Firebase Cloud Messaging (FCM) dan Push Notifications.
+/// Mendukung penerimaan pesan di foreground, background, dan saat aplikasi ditutup.
 class FcmService {
+  // Pattern Singleton untuk memastikan hanya ada satu instance layanan FCM.
   static final FcmService _instance = FcmService._internal();
   factory FcmService() => _instance;
   FcmService._internal();
 
   final FirebaseMessaging _fcm = FirebaseMessaging.instance;
 
+  /// Menginisialisasi layanan notifikasi untuk user tertentu.
   Future<void> initialize(int userId) async {
-    // Initialize Local Notifications first
+    // 1. Inisialisasi Layanan Notifikasi Lokal untuk menampilkan banner notifikasi di sistem.
     await LocalNotificationService.initialize();
-    
-    // 1. Request Permission
+
+    // 2. Meminta izin (Permission) notifikasi kepada user (terutama di iOS dan Android 13+).
     NotificationSettings settings = await _fcm.requestPermission(
       alert: true,
       badge: true,
@@ -23,53 +27,53 @@ class FcmService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('[FCM] User granted permission');
+      print('[FCM] User memberikan izin notifikasi');
     } else {
-      print('[FCM] User declined or has not accepted permission');
+      print('[FCM] User menolak atau belum memberikan izin notifikasi');
       return;
     }
 
-    // 2. Subscribe to topic based on User ID
+    // 3. Berlangganan (Subscribe) ke topik berdasarkan ID User.
+    // Ini memungkinkan pengiriman notifikasi spesifik ke user tertentu dari server.
     await _fcm.subscribeToTopic('user_$userId');
-    print('[FCM] Subscribed to topic: user_$userId');
+    print('[FCM] Berlangganan ke topik: user_$userId');
 
-    // 3. Handle Foreground Messages - Show System Notification
+    // 4. Menangani pesan saat aplikasi sedang terbuka (Foreground State).
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('🚀 Got a message whilst in the foreground!');
-      print('Message data: ${message.data}');
+      print('🚀 Mendapat pesan baru saat di foreground!');
 
       if (message.notification != null) {
-        print('Message also contained a notification: ${message.notification}');
-        
-        // Show SYSTEM notification in notification bar
+        // Menampilkan notifikasi sistem menggunakan LocalNotificationService.
         LocalNotificationService.showNotification(message);
       }
     });
 
-    // 4. Handle Background Notification Click (App in background)
+    // 5. Menangani klik notifikasi saat aplikasi di background (Background State).
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('🚀 Notification clicked from background!');
+      print('🚀 Notifikasi diklik dari background!');
+      // Arahkan user ke layar notifikasi.
       navigatorKey.currentState?.push(
-        MaterialPageRoute(builder: (_) => NotificationScreen())
+        MaterialPageRoute(builder: (_) => NotificationScreen()),
       );
     });
 
-    // 5. Handle Terminated State (App closed)
+    // 6. Menangani notifikasi saat aplikasi benar-benar tertutup (Terminated State).
     _fcm.getInitialMessage().then((RemoteMessage? message) {
       if (message != null) {
-        print('🚀 App opened from terminated state by notification!');
-        // Delay to allow app initialization
+        print('🚀 Aplikasi dibuka dari kondisi tertutup melalui notifikasi!');
+        // Beri jeda sedikit agar inisialisasi aplikasi selesai sebelum berpindah halaman.
         Future.delayed(const Duration(seconds: 1), () {
           navigatorKey.currentState?.push(
-            MaterialPageRoute(builder: (_) => NotificationScreen())
+            MaterialPageRoute(builder: (_) => NotificationScreen()),
           );
         });
       }
     });
   }
 
+  /// Berhenti berlangganan dari topik notifikasi user (saat logout).
   Future<void> unsubscribe(int userId) async {
     await _fcm.unsubscribeFromTopic('user_$userId');
-    print('[FCM] Unsubscribed from topic: user_$userId');
+    print('[FCM] Berhenti berlangganan dari topik: user_$userId');
   }
 }

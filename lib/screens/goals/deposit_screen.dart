@@ -8,6 +8,8 @@ import '../../providers/badge_provider.dart';
 import '../../widgets/badge_celebration_dialog.dart';
 import '../../widgets/overflow_allocation_dialog.dart';
 
+/// Layar untuk menambahkan tabungan (deposit) ke dalam goal.
+/// Mendukung berbagai metode pembayaran dan menangani skenario goal tercapai atau overflow.
 class DepositScreen extends StatefulWidget {
   final int goalId;
   final String goalName;
@@ -25,6 +27,7 @@ class _DepositScreenState extends State<DepositScreen> {
   final _descCtrl = TextEditingController();
 
   String _selectedMethod = 'manual';
+  // Daftar metode pembayaran yang tersedia
   final Map<String, Map<String, dynamic>> _paymentMethods = {
     'manual': {
       'name': 'Manual Cash',
@@ -74,13 +77,15 @@ class _DepositScreenState extends State<DepositScreen> {
     super.dispose();
   }
 
+  /// Memproses deposit tabungan.
+  /// Memvalidasi input, mengirim request deposit, dan menangani respons (termasuk overflow).
   void _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      // REDUNDANT CHECK: Ensure goal is not already completed
+      // PENGECEKAN REDUNDAN: Pastikan goal belum tercapai sebelum deposit
       final goal = Provider.of<GoalProvider>(
         context,
         listen: false,
@@ -96,7 +101,7 @@ class _DepositScreenState extends State<DepositScreen> {
         _amountCtrl.text.replaceAll('.', '').replaceAll(',', ''),
       );
 
-      // UPDATED: Now receives overflow info
+      // UPDATED: Sekarang menerima informasi overflow dari provider
       final result = await Provider.of<GoalProvider>(context, listen: false)
           .addTransaction(
             goalId: widget.goalId,
@@ -109,12 +114,12 @@ class _DepositScreenState extends State<DepositScreen> {
 
       if (!mounted) return;
 
-      // UPDATED: Check for overflow
+      // UPDATED: Cek apakah ada overflow (kelebihan bayar)
       if (result['overflow_amount'] != null && result['overflow_amount'] > 0) {
-        // Goal completed with overflow
-        Navigator.pop(context, true); // Close deposit screen first
+        // Goal tercapai dengan overflow
+        Navigator.pop(context, true); // Tutup layar deposit terlebih dahulu
 
-        // Show overflow allocation dialog
+        // Tampilkan dialog alokasi overflow
         showOverflowAllocationDialog(
           context: context,
           overflowAmount: result['overflow_amount'].toDouble(),
@@ -122,7 +127,7 @@ class _DepositScreenState extends State<DepositScreen> {
           sourceMethod: _selectedMethod,
         );
       } else {
-        // Normal deposit without overflow
+        // Deposit normal tanpa overflow
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -135,7 +140,7 @@ class _DepositScreenState extends State<DepositScreen> {
           ),
         );
 
-        // --- NEW: Trigger Badge Check ---
+        // --- BARU: Pemicu Pengecekan Badge (Lencana) ---
         try {
           final badgeProvider = Provider.of<BadgeProvider>(
             context,
@@ -144,9 +149,9 @@ class _DepositScreenState extends State<DepositScreen> {
           final newBadges = await badgeProvider.checkAndAwardBadges();
 
           if (newBadges.isNotEmpty && mounted) {
-            // Show celebration and wait for it to be dismissed if needed,
-            // or show it and then pop. Best to show it on parent context if popping.
-            // But for now, let's show it then pop when they close it.
+            // Tampilkan dialog perayaan badge jika ada badge baru yang diraih
+            // atau tampilkan dan kemudian pop. Terbaik untuk menampilkannya di konteks induk jika popping.
+            // Tapi untuk sekarang, mari kita tampilkan lalu pop saat ditutup.
             if (mounted) {
               await showDialog(
                 context: context,
@@ -187,10 +192,10 @@ class _DepositScreenState extends State<DepositScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Custom Header
+            // Header Kustom
             const _CustomHeader(),
 
-            // Main Content
+            // Konten Utama
             Expanded(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
@@ -201,7 +206,7 @@ class _DepositScreenState extends State<DepositScreen> {
                     children: [
                       const SizedBox(height: 20),
 
-                      // Title
+                      // Judul
                       Text(
                         'Tambah Tabungan 💰',
                         style: TextStyle(
@@ -221,7 +226,7 @@ class _DepositScreenState extends State<DepositScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Amount Field
+                      // Field Nominal
                       CurrencyInputField(
                         label: 'Nominal Tabungan',
                         controller: _amountCtrl,
@@ -230,7 +235,7 @@ class _DepositScreenState extends State<DepositScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Payment Method Selection
+                      // Pilihan Sumber Dana
                       Text(
                         'Sumber Dana',
                         style: TextStyle(
@@ -246,7 +251,7 @@ class _DepositScreenState extends State<DepositScreen> {
                             context,
                           ).goals;
 
-                          // Safety check: if goals are being refreshed or empty
+                          // Safety check: jika goals sedang direfresh atau kosong
                           if (goals.isEmpty) {
                             return const Center(
                               child: Padding(
@@ -256,12 +261,12 @@ class _DepositScreenState extends State<DepositScreen> {
                             );
                           }
 
-                          // Find goal safely
+                          // Cari goal dengan aman
                           final goalIndex = goals.indexWhere(
                             (g) => g.id == widget.goalId,
                           );
                           if (goalIndex == -1) {
-                            // If goal not found in the new list (e.g. deleted or session changed)
+                            // Jika goal tidak ditemukan (misal dihapus atau sesi berubah)
                             return const Center(
                               child: Text('Goal tidak ditemukan'),
                             );
@@ -273,18 +278,18 @@ class _DepositScreenState extends State<DepositScreen> {
                           );
                           final isCashGoal = goal.type == 'cash';
 
-                          // Filter methods
+                          // Filter metode pembayaran yang sesuai
                           final allowedMethods = _paymentMethods.entries
                               .where((entry) {
                                 if (isCashGoal) {
                                   return entry.key == 'manual';
                                 } else {
-                                  // Digital goal: allow everything EXCEPT manual
+                                  // Goal digital: izinkan semua KECUALI manual
                                   return entry.key != 'manual';
                                 }
                               })
                               .where((entry) {
-                                // Balance check (for digital)
+                                // Cek saldo jika sumber dana adalah 'balance'
                                 if (entry.key == 'balance') {
                                   final user = Provider.of<AuthProvider>(
                                     context,
@@ -296,8 +301,8 @@ class _DepositScreenState extends State<DepositScreen> {
                               })
                               .toList();
 
-                          // Ensure selected method is valid
-                          // We can't update state here, so we select a display value
+                          // Pastikan metode yang dipilih valid
+                          // Kita tidak bisa update state di sini, jadi kita pilih nilai tampilan
                           String displaySelected = _selectedMethod;
                           bool isValid = allowedMethods.any(
                             (e) => e.key == _selectedMethod,
@@ -305,7 +310,7 @@ class _DepositScreenState extends State<DepositScreen> {
 
                           if (!isValid && allowedMethods.isNotEmpty) {
                             displaySelected = allowedMethods.first.key;
-                            // Schedule state update to sync variable (optional but good for consistency)
+                            // Jadwalkan update state untuk mensinkronkan variabel
                             WidgetsBinding.instance.addPostFrameCallback((_) {
                               if (_selectedMethod != displaySelected) {
                                 setState(
@@ -400,7 +405,7 @@ class _DepositScreenState extends State<DepositScreen> {
                       ),
                       const SizedBox(height: 20),
 
-                      // Description Field
+                      // Field Catatan (Opsional)
                       Text(
                         'Catatan (Opsional)',
                         style: TextStyle(
@@ -451,7 +456,7 @@ class _DepositScreenState extends State<DepositScreen> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Submit Button
+                      // Tombol Simpan Tabungan
                       SizedBox(
                         width: double.infinity,
                         height: 56,
@@ -527,6 +532,7 @@ class _DepositScreenState extends State<DepositScreen> {
   }
 }
 
+/// Header kustom sederhana.
 class _CustomHeader extends StatelessWidget {
   const _CustomHeader({Key? key}) : super(key: key);
 
@@ -538,7 +544,7 @@ class _CustomHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // GoalMoney Logo
+          // Logo GoalMoney
           Row(
             children: [
               Container(
@@ -570,7 +576,7 @@ class _CustomHeader extends StatelessWidget {
             ],
           ),
 
-          // Back Button
+          // Tombol Kembali
           IconButton(
             icon: const Icon(Icons.arrow_back_rounded, color: Colors.grey),
             onPressed: () => Navigator.pop(context),
@@ -581,7 +587,7 @@ class _CustomHeader extends StatelessWidget {
   }
 }
 
-/// Currency Input Field with proper placeholder behavior
+/// Input field khusus mata uang dengan format Rupiah otomatis.
 class CurrencyInputField extends StatefulWidget {
   final String label;
   final TextEditingController controller;

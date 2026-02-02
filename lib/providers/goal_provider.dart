@@ -7,27 +7,47 @@ import '../core/api_client.dart';
 import '../core/photo_storage_service.dart';
 import '../services/fcm_service.dart';
 
+/// Provider utama untuk mengelola state dan logika bisnis terkait Goal (Target Tabungan).
+/// Menggunakan [ChangeNotifier] untuk memberitahu UI saat data berubah.
 class GoalProvider with ChangeNotifier {
+  /// Instance ApiClient untuk melakukan request HTTP ke backend PHP.
   final ApiClient _apiClient = ApiClient();
+
+  /// Daftar seluruh goal milik user yang sedang login.
   List<Goal> _goals = [];
+
+  /// Data ringkasan (summary) untuk ditampilkan di Dashboard.
   Map<String, dynamic>? _dashboardSummary;
+
+  /// Status loading umum untuk operasi fetching data.
   bool _isLoading = false;
 
-  // Withdrawal state
+  // State terkait Penarikan (Withdrawal)
+  /// Ringkasan saldo dan status penarikan.
   WithdrawalSummary? _withdrawalSummary;
+
+  /// Riwayat penarikan dana.
   List<Withdrawal> _withdrawals = [];
 
-  // Notification state
+  // State terkait Notifikasi
+  /// Daftar pesan notifikasi terbaru.
   List<Map<String, dynamic>> _notifications = [];
 
-  // Report state
+  // State terkait Laporan (Report)
+  /// Objek laporan tabungan lengkap.
   SavingsReport? _report;
+
+  /// Status loading khusus untuk fetching laporan.
   bool _isLoadingReport = false;
 
-  // Forecast state
+  // State terkait Prediksi (Forecast)
+  /// Daftar estimasi waktu pencapaian goal.
   List<Map<String, dynamic>> _forecasts = [];
+
+  /// Status loading khusus untuk fetching prediksi.
   bool _isLoadingForecast = false;
 
+  // Getters untuk akses data dari UI
   List<Goal> get goals => _goals;
   Map<String, dynamic>? get summary => _dashboardSummary;
   bool get isLoading => _isLoading;
@@ -39,9 +59,10 @@ class GoalProvider with ChangeNotifier {
   List<Map<String, dynamic>> get forecasts => _forecasts;
   bool get isLoadingForecast => _isLoadingForecast;
 
+  /// Mengambil daftar goal dari API dan memuat foto lokal secara paralel.
   Future<void> fetchGoals() async {
     _isLoading = true;
-    _goals = []; // Clear old data
+    _goals = []; // Bersihkan data lama
     notifyListeners();
     try {
       final response = await _apiClient.dio.get('/goals/index');
@@ -50,10 +71,10 @@ class GoalProvider with ChangeNotifier {
         final tempGoals = data.map((json) => Goal.fromJson(json)).toList();
 
         print(
-          '[GoalProvider] Fetched ${tempGoals.length} goals. Loading images in parallel...',
+          '[GoalProvider] Berhasil mengambil ${tempGoals.length} goal. Memuat gambar...',
         );
 
-        // Load photo paths in parallel
+        // Memuat path foto lokal secara paralel untuk meningkatkan performa
         final goalsWithPhotos = await Future.wait(
           tempGoals.map((goal) async {
             try {
@@ -70,11 +91,13 @@ class GoalProvider with ChangeNotifier {
                   description: goal.description,
                   progressPercentage: goal.progressPercentage,
                   photoPath: photoPath,
+                  type: goal.type,
+                  createdAt: goal.createdAt,
                 );
               }
             } catch (e) {
               print(
-                '[GoalProvider] Error loading photo for goal ${goal.id}: $e',
+                '[GoalProvider] Gagal memuat foto untuk goal ${goal.id}: $e',
               );
             }
             return goal;
@@ -84,13 +107,15 @@ class GoalProvider with ChangeNotifier {
         _goals = goalsWithPhotos;
       }
     } catch (e) {
-      print('[GoalProvider] Error fetching goals: $e');
+      print('[GoalProvider] Error saat fetchGoals: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
     }
   }
 
+  /// Membuat goal baru di database.
+  /// Mengembalikan ID goal jika berhasil, atau null jika gagal.
   Future<int?> createGoal({
     required String name,
     required double targetAmount,
@@ -111,25 +136,25 @@ class GoalProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        // Extract goal ID from response
         int? goalId;
         if (response.data['data'] != null &&
             response.data['data']['id'] != null) {
           goalId = response.data['data']['id'];
-          print('[GoalProvider] New goal created with ID: $goalId');
+          print('[GoalProvider] Goal baru dibuat dengan ID: $goalId');
         }
 
-        // Parallel refresh
+        // Segarkan data dashboard dan daftar goal secara paralel
         await Future.wait([fetchGoals(), fetchDashboardSummary()]);
 
         return goalId;
       }
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Failed to create goal');
+      throw Exception(e.response?.data['message'] ?? 'Gagal membuat goal');
     }
     return null;
   }
 
+  /// Memperbarui data goal yang sudah ada.
   Future<void> updateGoal({
     required int id,
     String? name,
@@ -146,13 +171,14 @@ class GoalProvider with ChangeNotifier {
 
       await _apiClient.dio.put('/goals/update', data: data);
 
-      // Parallel refresh
+      // Segarkan data dashboard dan daftar goal secara paralel
       await Future.wait([fetchGoals(), fetchDashboardSummary()]);
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Failed to update goal');
+      throw Exception(e.response?.data['message'] ?? 'Gagal memperbarui goal');
     }
   }
 
+  /// Menghapus goal berdasarkan ID.
   Future<void> deleteGoal(int id) async {
     try {
       await _apiClient.dio.delete('/goals/delete', data: {'id': id});
@@ -160,10 +186,12 @@ class GoalProvider with ChangeNotifier {
       await fetchDashboardSummary();
       notifyListeners();
     } on DioException catch (e) {
-      throw Exception(e.response?.data['message'] ?? 'Failed to delete goal');
+      throw Exception(e.response?.data['message'] ?? 'Gagal menghapus goal');
     }
   }
 
+  /// Menambahkan setoran uangan (transaksi) ke sebuah goal.
+  /// Mengembalikan data respons (yang mungkin berisi info overflow saldo).
   Future<Map<String, dynamic>> addTransaction({
     required int goalId,
     required double amount,
@@ -182,21 +210,21 @@ class GoalProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        // Parallel refresh
+        // Segarkan data secara paralel
         await Future.wait([fetchGoals(), fetchDashboardSummary()]);
 
-        // Return the data which may include overflow info
         return response.data['data'] ?? {};
       }
 
-      throw Exception('Unexpected response');
+      throw Exception('Respons tidak terduga');
     } on DioException catch (e) {
       throw Exception(
-        e.response?.data['message'] ?? 'Failed to add transaction',
+        e.response?.data['message'] ?? 'Gagal menambahkan transaksi',
       );
     }
   }
 
+  /// Mengalokasikan kelebihan saldo (overflow) ke goal lain atau simpan ke saldo tersedia.
   Future<Map<String, dynamic>> allocateOverflow({
     required List<Map<String, dynamic>> allocations,
     double? saveToBalanceAmount,
@@ -221,45 +249,48 @@ class GoalProvider with ChangeNotifier {
 
         return response.data['data'] ?? {};
       }
-      throw Exception('Unexpected response');
+      throw Exception('Respons tidak terduga');
     } on DioException catch (e) {
       throw Exception(
-        e.response?.data['message'] ?? 'Failed to allocate overflow',
+        e.response?.data['message'] ?? 'Gagal mengalokasikan overflow',
       );
     }
   }
 
+  /// Mengambil data ringkasan untuk dashboard (total saldo, target, user info, dll).
   Future<void> fetchDashboardSummary() async {
     try {
-      _dashboardSummary = null; // Clear old data
+      _dashboardSummary = null; // Bersihkan data lama
       final response = await _apiClient.dio.get('/dashboard/summary');
       if (response.statusCode == 200) {
         _dashboardSummary = response.data['data'];
 
-        // Initialize Notification Service if user info is present
+        // Inisialisasi Layanan Notifikasi Firebase jika data user tersedia
         if (_dashboardSummary != null &&
             _dashboardSummary!.containsKey('user')) {
           try {
             final userId = _dashboardSummary!['user']['id'];
             await FcmService().initialize(userId);
             print(
-              '[GoalProvider] Notification service initialized for user $userId',
+              '[GoalProvider] Layanan notifikasi diinisialisasi untuk user $userId',
             );
           } catch (e) {
-            print('[GoalProvider] Failed to init notification service: $e');
+            print(
+              '[GoalProvider] Gagal menginisialisasi layanan notifikasi: $e',
+            );
           }
         }
 
         notifyListeners();
       }
     } on DioException catch (e) {
-      print('Error fetching dashboard summary: ${e.message}');
+      print('Gagal mengambil summary dashboard: ${e.message}');
     }
   }
 
-  // ===== WITHDRAWAL METHODS =====
+  // ===== METODE PENARIKAN (WITHDRAWAL) =====
 
-  /// Request withdrawal from a specific goal or available balance
+  /// Mengajukan permintaan penarikan dari goal tertentu atau saldo tersedia.
   Future<void> requestWithdrawal({
     int? goalId,
     required double amount,
@@ -269,7 +300,7 @@ class GoalProvider with ChangeNotifier {
   }) async {
     try {
       print(
-        '[GoalProvider] Requesting withdrawal of $amount from ${goalId != null ? "goal $goalId" : "Available Balance"} via $method',
+        '[GoalProvider] Meminta penarikan sebesar $amount dari ${goalId != null ? "goal $goalId" : "Saldo Tersedia"} melalui $method',
       );
       final response = await _apiClient.dio.post(
         '/withdrawals/request',
@@ -283,23 +314,23 @@ class GoalProvider with ChangeNotifier {
       );
 
       if (response.statusCode == 201) {
-        print('[GoalProvider] Withdrawal request created successfully');
+        print('[GoalProvider] Permintaan penarikan berhasil dibuat');
         await fetchWithdrawalHistory();
-        await fetchGoals(); // Refresh goals to update balances
+        await fetchGoals(); // Refresh goal untuk memperbarui saldo
         notifyListeners();
       }
     } on DioException catch (e) {
-      print('[GoalProvider] Withdrawal error: ${e.response?.data}');
+      print('[GoalProvider] Error penarikan: ${e.response?.data}');
       throw Exception(
-        e.response?.data['message'] ?? 'Failed to request withdrawal',
+        e.response?.data['message'] ?? 'Gagal mengajukan penarikan',
       );
     }
   }
 
-  /// Get withdrawal history
+  /// Mengambil riwayat penarikan dana.
   Future<void> fetchWithdrawalHistory({String? status}) async {
     try {
-      print('[GoalProvider] Fetching withdrawal history');
+      print('[GoalProvider] Mengambil riwayat penarikan');
       final Map<String, dynamic> queryParams = {};
       if (status != null) queryParams['status'] = status;
 
@@ -311,12 +342,12 @@ class GoalProvider with ChangeNotifier {
       if (response.statusCode == 200) {
         final data = response.data['data'];
 
-        // Parse summary
+        // Parsing ringkasan penarikan
         if (data['summary'] != null) {
           _withdrawalSummary = WithdrawalSummary.fromJson(data['summary']);
         }
 
-        // Parse withdrawals
+        // Parsing daftar penarikan
         if (data['withdrawals'] != null) {
           final List withdrawalList = data['withdrawals'];
           _withdrawals = withdrawalList
@@ -324,31 +355,34 @@ class GoalProvider with ChangeNotifier {
               .toList();
         }
 
-        print('[GoalProvider] Fetched ${_withdrawals.length} withdrawals');
+        print(
+          '[GoalProvider] Berhasil mengambil ${_withdrawals.length} riwayat penarikan',
+        );
         notifyListeners();
       }
     } on DioException catch (e) {
-      print('[GoalProvider] Error fetching withdrawals: ${e.message}');
+      print('[GoalProvider] Error saat mengambil penarikan: ${e.message}');
       throw Exception(
-        e.response?.data['message'] ?? 'Failed to fetch withdrawal history',
+        e.response?.data['message'] ?? 'Gagal mengambil riwayat penarikan',
       );
     }
   }
 
-  /// Get available balance for withdrawal
+  /// Mendapatkan saldo yang tersedia untuk ditarik.
   double getAvailableBalance() {
     if (_withdrawalSummary == null) return 0;
     return _withdrawalSummary!.availableForWithdrawal;
   }
 
-  /// Get total pending withdrawal
+  /// Mendapatkan total dana yang sedang menunggu proses penarikan.
   double getTotalPendingWithdrawal() {
     if (_withdrawalSummary == null) return 0;
     return _withdrawalSummary!.totalPendingWithdrawal;
   }
 
-  // ===== NOTIFICATION METHODS =====
+  // ===== METODE NOTIFIKASI (NOTIFICATION) =====
 
+  /// Mengambil daftar notifikasi terbaru user.
   Future<void> fetchNotifications() async {
     try {
       final response = await _apiClient.dio.get('/notifications/index');
@@ -360,13 +394,12 @@ class GoalProvider with ChangeNotifier {
       }
     } on DioException catch (e) {
       print('[GoalProvider] Error fetching notifications: ${e.response?.data}');
-      // Don't throw, just log so it doesn't crash UI
     }
   }
 
-  // ===== REPORT METHODS =====
+  // ===== METODE LAPORAN (REPORT) =====
 
-  /// Fetch savings report from API
+  /// Mengambil laporan tabungan lengkap dari API dengan filter opsional.
   Future<void> fetchReport({
     String? startDate,
     String? endDate,
@@ -383,7 +416,7 @@ class GoalProvider with ChangeNotifier {
         queryParams['search'] = searchQuery;
       }
 
-      print('[GoalProvider] Fetching savings report with filters...');
+      print('[GoalProvider] Mengambil laporan tabungan dengan filter...');
       final response = await _apiClient.dio.get(
         '/reports/report',
         queryParameters: queryParams,
@@ -391,23 +424,24 @@ class GoalProvider with ChangeNotifier {
 
       if (response.statusCode == 200 && response.data['success'] == true) {
         _report = SavingsReport.fromJson(response.data['data']);
-        print('[GoalProvider] Report fetched successfully');
+        print('[GoalProvider] Laporan berhasil diambil');
       }
     } on DioException catch (e) {
-      print('[GoalProvider] Error fetching report: ${e.response?.data}');
-      throw Exception(e.response?.data['message'] ?? 'Failed to fetch report');
+      print('[GoalProvider] Error saat mengambil laporan: ${e.response?.data}');
+      throw Exception(e.response?.data['message'] ?? 'Gagal mengambil laporan');
     } finally {
       _isLoadingReport = false;
       notifyListeners();
     }
   }
 
-  /// Clear cached report
+  /// Menghapus data laporan dari cache (biasanya saat keluar halaman).
   void clearReport() {
     _report = null;
     notifyListeners();
   }
 
+  /// Mengambil data prediksi/estimasi pencapaian goal.
   Future<void> fetchForecasts({int? goalId}) async {
     _isLoadingForecast = true;
     notifyListeners();
@@ -426,13 +460,16 @@ class GoalProvider with ChangeNotifier {
         _forecasts = List<Map<String, dynamic>>.from(data);
       }
     } on DioException catch (e) {
-      print('[GoalProvider] Error fetching forecasts: ${e.response?.data}');
+      print(
+        '[GoalProvider] Error saat mengambil prediksi: ${e.response?.data}',
+      );
     } finally {
       _isLoadingForecast = false;
       notifyListeners();
     }
   }
 
+  /// Mendapatkan data prediksi khusus untuk satu goal berdasarkan ID.
   Map<String, dynamic>? getForecastForGoal(int goalId) {
     try {
       return _forecasts.firstWhere((f) => f['goal_id'] == goalId);
@@ -441,7 +478,7 @@ class GoalProvider with ChangeNotifier {
     }
   }
 
-  /// Clear all data (on logout)
+  /// Membersihkan seluruh data state (digunakan saat logout).
   void clear() {
     _goals = [];
     _dashboardSummary = null;

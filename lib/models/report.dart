@@ -1,19 +1,39 @@
 // lib/models/report.dart
 // Model untuk Laporan Progress Tabungan GoalMoney
 
+/// Model utama untuk Laporan Tabungan GoalMoney yang mencakup seluruh data performa.
 class SavingsReport {
+  /// Tanggal pembuatan laporan.
   final String reportDate;
+
+  /// Judul laporan yang ditampilkan.
   final String reportTitle;
+
+  /// Rentang waktu laporan (mulai - selesai).
   final ReportPeriod period;
+
+  /// Ringkasan statistik tabungan.
   final ReportSummary summary;
+
+  /// Daftar detail performa tiap goal.
   final List<GoalReport> goals;
+
+  /// Daftar pencapaian selama periode laporan.
   final List<Achievement> achievements;
+
+  /// Tips tabungan yang dipersonalisasi.
   final List<SavingsTip> tips;
+
+  /// Rincian tabungan per bulan untuk grafik.
   final List<MonthlyBreakdown> monthlyBreakdown;
+
+  /// Riwayat transaksi selama periode.
   final List<ReportTransaction> transactions;
+
+  /// Badge yang diperoleh dalam periode ini.
   final List<ReportBadge> badges;
 
-  // Alias for UI compatibility
+  /// Alias untuk kompatibilitas UI lama.
   List<GoalReport> get goalDetails => goals;
 
   SavingsReport({
@@ -29,6 +49,7 @@ class SavingsReport {
     required this.badges,
   });
 
+  /// Mengonversi JSON dari API Laporan menjadi objek SavingsReport.
   factory SavingsReport.fromJson(Map<String, dynamic> json) {
     return SavingsReport(
       reportDate: json['report_date'] ?? '',
@@ -69,13 +90,14 @@ class SavingsReport {
   }
 }
 
+/// Mewakili periode waktu (tanggal mulai dan selesai).
 class ReportPeriod {
   final String start;
   final String end;
 
   ReportPeriod({required this.start, required this.end});
 
-  // Aliases for UI compatibility
+  /// Alias getter untuk kompatibilitas UI.
   String get startDate => start;
   String get endDate => end;
 
@@ -84,15 +106,33 @@ class ReportPeriod {
   }
 }
 
+/// Ringkasan statistik utama tabungan user.
 class ReportSummary {
+  /// Total target yang pernah dibuat.
   final int totalGoals;
+
+  /// Jumlah target yang sudah selesai.
   final int completedGoals;
+
+  /// Jumlah target yang masih aktif.
   final int activeGoals;
+
+  /// Total seluruh uang yang sudah ditabung.
   final double totalSaved;
+
+  /// Total target uang dari seluruh goal.
   final double totalTarget;
+
+  /// Persentase progres kumulatif.
   final double overallProgress;
+
+  /// Jumlah uang yang ditabung khusus dalam periode laporan.
   final double periodSavings;
+
+  /// Total berapa kali user melakukan setoran.
   final int totalDeposits;
+
+  /// Total berapa kali user melakukan penarikan.
   final int totalWithdrawals;
 
   ReportSummary({
@@ -122,6 +162,7 @@ class ReportSummary {
   }
 }
 
+/// Detail performa untuk objek Goal di dalam laporan.
 class GoalReport {
   final int id;
   final String name;
@@ -174,16 +215,27 @@ class GoalReport {
 
   bool get isCompleted => status == 'completed';
 
-  // Alias for UI compatibility
+  /// Alias getter untuk progres.
   double get progress => progressPercentage;
 }
 
+/// Representasi pencapaian atau milestone yang diraih user.
 class Achievement {
+  /// Tipe pencapaian (misal: 'goal_completed').
   final String type;
+
+  /// Icon emoji atau path icon.
   final String icon;
+
+  /// Judul pencapaian.
   final String title;
+
+  /// Penjelasan detail pencapaian.
   final String description;
+
+  /// Nama target yang terkait (jika ada).
   final String? goalName;
+
   final double? amount;
   final double? progress;
   final double? remaining;
@@ -216,6 +268,7 @@ class Achievement {
   }
 }
 
+/// Tips menabung yang disarankan sistem.
 class SavingsTip {
   final String icon;
   final String tip;
@@ -232,6 +285,7 @@ class SavingsTip {
   }
 }
 
+/// Rincian tabungan bulanan (untuk keperluan charting).
 class MonthlyBreakdown {
   final String month;
   final int monthNumber;
@@ -247,8 +301,10 @@ class MonthlyBreakdown {
     required this.depositCount,
   });
 
-  // Aliases for UI compatibility
+  /// Alias getter untuk total tabungan.
   double get totalSaved => amount;
+
+  /// Alias getter untuk jumlah setoran.
   int get transactionCount => depositCount;
 
   factory MonthlyBreakdown.fromJson(Map<String, dynamic> json) {
@@ -262,6 +318,7 @@ class MonthlyBreakdown {
   }
 }
 
+/// Data transaksi di dalam Laporan.
 class ReportTransaction {
   final int id;
   final String goalName;
@@ -291,6 +348,7 @@ class ReportTransaction {
   }
 }
 
+/// Mewakili Badge yang diraih oleh user.
 class ReportBadge {
   final int id;
   final String code;
@@ -325,8 +383,10 @@ class ReportBadge {
     );
   }
 
-  // Helper to get tier/category for display
+  /// Mendapatkan kategori badge dari kode prefix.
   String get displayCategory => code.split('_').first.toLowerCase();
+
+  /// Mendapatkan tingkatan (tier) badge.
   String get displayTier {
     if (code.contains('platinum')) return 'platinum';
     if (code.contains('gold')) return 'gold';

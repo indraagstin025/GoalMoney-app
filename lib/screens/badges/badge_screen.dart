@@ -6,6 +6,8 @@ import 'package:provider/provider.dart';
 import '../../providers/badge_provider.dart';
 import '../../models/badge.dart';
 
+/// Layar Koleksi Badge yang menampilkan semua pencapaian yang telah dan belum didapatkan.
+/// Menggunakan [TabBar] untuk memisahkan kategori badge "Diperoleh" dan "Belum Diperoleh".
 class BadgeScreen extends StatefulWidget {
   const BadgeScreen({super.key});
 
@@ -15,6 +17,7 @@ class BadgeScreen extends StatefulWidget {
 
 class _BadgeScreenState extends State<BadgeScreen>
     with SingleTickerProviderStateMixin {
+  /// Kontroler untuk mengelola perpindahan antartab.
   late TabController _tabController;
 
   @override
@@ -38,52 +41,124 @@ class _BadgeScreenState extends State<BadgeScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        title: const Text('Koleksi Badge'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        centerTitle: true,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.green,
-          labelColor: Colors.green,
-          unselectedLabelColor: Colors.grey,
-          tabs: const [
-            Tab(text: 'Diperoleh', icon: Icon(Icons.emoji_events)),
-            Tab(text: 'Belum Diperoleh', icon: Icon(Icons.lock_outline)),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Branded Header
+            _buildCustomHeader(context, isDark),
+
+            // TabBar below header
+            Container(
+              color: Theme.of(context).cardTheme.color,
+              child: TabBar(
+                controller: _tabController,
+                indicatorColor: Colors.green,
+                labelColor: Colors.green,
+                unselectedLabelColor: Colors.grey,
+                tabs: const [
+                  Tab(text: 'Diperoleh', icon: Icon(Icons.emoji_events)),
+                  Tab(text: 'Belum Diperoleh', icon: Icon(Icons.lock_outline)),
+                ],
+              ),
+            ),
+
+            Expanded(
+              child: Consumer<BadgeProvider>(
+                builder: (context, provider, _) {
+                  if (provider.isLoading) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  return Column(
+                    children: [
+                      // Stats Card
+                      _buildStatsCard(provider, isDark),
+
+                      // Tab View
+                      Expanded(
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            // Earned Badges
+                            _buildBadgeGrid(
+                              provider.earnedBadges,
+                              true,
+                              isDark,
+                            ),
+                            // Unearned Badges
+                            _buildBadgeGrid(
+                              provider.unearnedBadges,
+                              false,
+                              isDark,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
           ],
         ),
-      ),
-      body: Consumer<BadgeProvider>(
-        builder: (context, provider, _) {
-          if (provider.isLoading) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          return Column(
-            children: [
-              // Stats Card
-              _buildStatsCard(provider, isDark),
-
-              // Tab View
-              Expanded(
-                child: TabBarView(
-                  controller: _tabController,
-                  children: [
-                    // Earned Badges
-                    _buildBadgeGrid(provider.earnedBadges, true, isDark),
-                    // Unearned Badges
-                    _buildBadgeGrid(provider.unearnedBadges, false, isDark),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
       ),
     );
   }
 
+  /// Membangun header kustom dengan logo GoalMoney.
+  Widget _buildCustomHeader(BuildContext context, bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      color: Theme.of(context).cardTheme.color,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // GoalMoney Logo
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.green.shade700, Colors.green.shade500],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.savings_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'GoalMoney',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.lightGreen,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
+
+          // Back Button
+          IconButton(
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              color: isDark ? Colors.white : Colors.black87,
+            ),
+            onPressed: () => Navigator.pop(context),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Membangun kartu statistik ringkasan badge (Progress Bar).
   Widget _buildStatsCard(BadgeProvider provider, bool isDark) {
     final stats = provider.stats;
     if (stats == null) return const SizedBox.shrink();
@@ -158,6 +233,7 @@ class _BadgeScreenState extends State<BadgeScreen>
     );
   }
 
+  /// Membangun grid tampilan daftar badge.
   Widget _buildBadgeGrid(List<Badge> badges, bool earned, bool isDark) {
     if (badges.isEmpty) {
       return Center(
@@ -174,7 +250,10 @@ class _BadgeScreenState extends State<BadgeScreen>
               earned
                   ? 'Belum ada badge yang diperoleh'
                   : 'Semua badge sudah diperoleh! 🎉',
-              style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+              style: TextStyle(
+                fontSize: 16,
+                color: isDark ? Colors.grey.shade500 : Colors.black87,
+              ),
             ),
           ],
         ),
@@ -196,6 +275,7 @@ class _BadgeScreenState extends State<BadgeScreen>
     );
   }
 
+  /// Membangun kartu individu untuk setiap badge.
   Widget _buildBadgeCard(Badge badge, bool earned, bool isDark) {
     return GestureDetector(
       onTap: () => _showBadgeDetail(badge, earned),
@@ -291,12 +371,14 @@ class _BadgeScreenState extends State<BadgeScreen>
     );
   }
 
+  /// Menghitung rasio progress pencapaian badge (0.0 - 1.0).
   double _getProgressRatio(Badge badge) {
     if (badge.requirementValue == 0) return 0.0;
     double ratio = badge.currentValue / badge.requirementValue;
     return ratio.clamp(0.0, 1.0);
   }
 
+  /// Menentukan warna progress bar berdasarkan persentase penyelesaian.
   Color _getProgressColor(Badge badge) {
     double ratio = _getProgressRatio(badge);
     if (ratio >= 0.75) return Colors.green;
@@ -304,6 +386,7 @@ class _BadgeScreenState extends State<BadgeScreen>
     return Colors.blue;
   }
 
+  /// Memformat string tanggal menjadi format yang mudah dibaca (DD/MM/YYYY).
   String _formatDate(String dateStr) {
     try {
       final date = DateTime.parse(dateStr);
@@ -313,6 +396,7 @@ class _BadgeScreenState extends State<BadgeScreen>
     }
   }
 
+  /// Mendapatkan teks deskripsi syarat untuk mendapatkan badge tertentu.
   String _getRequirementText(Badge badge) {
     switch (badge.requirementType) {
       case 'streak':
@@ -334,6 +418,7 @@ class _BadgeScreenState extends State<BadgeScreen>
     }
   }
 
+  /// Memformat angka besar menjadi singkatan k (ribuan) atau jt (jutaan).
   String _formatNumber(int number) {
     if (number >= 1000000) {
       return '${(number / 1000000).toStringAsFixed(0)}jt';
@@ -343,125 +428,140 @@ class _BadgeScreenState extends State<BadgeScreen>
     return number.toString();
   }
 
+  /// Menampilkan detail badge secara lengkap melalui BottomSheet.
   void _showBadgeDetail(Badge badge, bool earned) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Icon
-            Container(
-              width: 100,
-              height: 100,
-              decoration: BoxDecoration(
-                color: earned
-                    ? Colors.amber.withOpacity(0.2)
-                    : Colors.grey.withOpacity(0.2),
-                shape: BoxShape.circle,
-              ),
-              child: Center(
-                child: earned
-                    ? Text(badge.icon, style: const TextStyle(fontSize: 50))
-                    : Icon(Icons.lock, size: 50, color: Colors.grey[400]),
-              ),
-            ),
-            const SizedBox(height: 16),
-            // Name
-            Text(
-              badge.name,
-              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 8),
-            // Description
-            Text(
-              badge.description,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            // Status
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: earned
-                    ? Colors.green.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Icon
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
                   color: earned
-                      ? Colors.green.withOpacity(0.3)
-                      : Colors.grey.withOpacity(0.3),
+                      ? Colors.amber.withOpacity(0.2)
+                      : Colors.grey.withOpacity(0.2),
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: earned
+                      ? Text(badge.icon, style: const TextStyle(fontSize: 50))
+                      : Icon(Icons.lock, size: 50, color: Colors.grey[400]),
                 ),
               ),
-              child: Column(
-                children: [
-                  Text(
-                    earned ? 'Berhasil Diperoleh!' : 'Progress Kamu',
-                    style: TextStyle(
-                      color: earned ? Colors.green[700] : Colors.grey[700],
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (!earned) ...[
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          badge.requirementType == 'total_saved'
-                              ? 'Rp ${_formatNumber(badge.currentValue.toInt())}'
-                              : '${badge.currentValue}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          badge.requirementType == 'total_saved'
-                              ? 'Rp ${_formatNumber(badge.requirementValue)}'
-                              : '${badge.requirementValue}',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: _getProgressRatio(badge),
-                        minHeight: 12,
-                        backgroundColor: Colors.grey[300],
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          _getProgressColor(badge),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      '${(_getProgressRatio(badge) * 100).toStringAsFixed(0)}% Selesai',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ] else ...[
-                    Text(
-                      'Diperoleh pada ${_formatDate(badge.earnedAt ?? "")}',
-                      style: TextStyle(color: Colors.green[700]),
-                    ),
-                  ],
-                ],
+              const SizedBox(height: 16),
+              // Name
+              Text(
+                badge.name,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+              const SizedBox(height: 8),
+              // Description
+              Text(
+                badge.description,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? Colors.grey.shade500 : Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Status
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: earned
+                      ? Colors.green.withOpacity(0.1)
+                      : Colors.grey.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: earned
+                        ? Colors.green.withOpacity(0.3)
+                        : Colors.grey.withOpacity(0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      earned ? 'Berhasil Diperoleh!' : 'Progress Kamu',
+                      style: TextStyle(
+                        color: earned ? Colors.green[700] : Colors.grey[700],
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (!earned) ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            badge.requirementType == 'total_saved'
+                                ? 'Rp ${_formatNumber(badge.currentValue.toInt())}'
+                                : '${badge.currentValue}',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          Text(
+                            badge.requirementType == 'total_saved'
+                                ? 'Rp ${_formatNumber(badge.requirementValue)}'
+                                : '${badge.requirementValue}',
+                            style: TextStyle(
+                              color: isDark
+                                  ? Colors.grey.shade500
+                                  : Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: LinearProgressIndicator(
+                          value: _getProgressRatio(badge),
+                          minHeight: 12,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _getProgressColor(badge),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '${(_getProgressRatio(badge) * 100).toStringAsFixed(0)}% Selesai',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark ? Colors.grey.shade500 : Colors.black87,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ] else ...[
+                      Text(
+                        'Diperoleh pada ${_formatDate(badge.earnedAt ?? "")}',
+                        style: TextStyle(color: Colors.green[700]),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        );
+      },
     );
   }
 }
