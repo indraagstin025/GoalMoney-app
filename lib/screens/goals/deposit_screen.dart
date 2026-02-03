@@ -7,6 +7,7 @@ import '../../core/validators.dart';
 import '../../providers/badge_provider.dart';
 import '../../widgets/badge_celebration_dialog.dart';
 import '../../widgets/overflow_allocation_dialog.dart';
+import '../../widgets/deposit_form_skeleton.dart';
 
 /// Layar untuk menambahkan tabungan (deposit) ke dalam goal.
 /// Mendukung berbagai metode pembayaran dan menangani skenario goal tercapai atau overflow.
@@ -69,6 +70,19 @@ class _DepositScreenState extends State<DepositScreen> {
     symbol: 'Rp ',
     decimalDigits: 0,
   );
+
+  bool _isInitializing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Simulasi inisialisasi singkat untuk menampilkan skeleton loading
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -197,333 +211,347 @@ class _DepositScreenState extends State<DepositScreen> {
 
             // Konten Utama
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
+              child: _isInitializing
+                  ? const DepositFormSkeleton()
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 20),
 
-                      // Judul
-                      Text(
-                        'Tambah Tabungan 💰',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).textTheme.titleLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Goal: ${widget.goalName}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.green.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Field Nominal
-                      CurrencyInputField(
-                        label: 'Nominal Tabungan',
-                        controller: _amountCtrl,
-                        isDarkMode: isDarkMode,
-                        validator: Validators.validateAmount,
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Pilihan Sumber Dana
-                      Text(
-                        'Sumber Dana',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Builder(
-                        builder: (context) {
-                          final goals = Provider.of<GoalProvider>(
-                            context,
-                          ).goals;
-
-                          // Safety check: jika goals sedang direfresh atau kosong
-                          if (goals.isEmpty) {
-                            return const Center(
-                              child: Padding(
-                                padding: EdgeInsets.all(20),
-                                child: CircularProgressIndicator(),
-                              ),
-                            );
-                          }
-
-                          // Cari goal dengan aman
-                          final goalIndex = goals.indexWhere(
-                            (g) => g.id == widget.goalId,
-                          );
-                          if (goalIndex == -1) {
-                            // Jika goal tidak ditemukan (misal dihapus atau sesi berubah)
-                            return const Center(
-                              child: Text('Goal tidak ditemukan'),
-                            );
-                          }
-
-                          final goal = goals[goalIndex];
-                          print(
-                            'DEBUG: DepositScreen Goal: ${goal.name}, Type: ${goal.type}, ID: ${goal.id}',
-                          );
-                          final isCashGoal = goal.type == 'cash';
-
-                          // Filter metode pembayaran yang sesuai
-                          final allowedMethods = _paymentMethods.entries
-                              .where((entry) {
-                                if (isCashGoal) {
-                                  return entry.key == 'manual';
-                                } else {
-                                  // Goal digital: izinkan semua KECUALI manual
-                                  return entry.key != 'manual';
-                                }
-                              })
-                              .where((entry) {
-                                // Cek saldo jika sumber dana adalah 'balance'
-                                if (entry.key == 'balance') {
-                                  final user = Provider.of<AuthProvider>(
-                                    context,
-                                  ).user;
-                                  return user != null &&
-                                      user.availableBalance > 0;
-                                }
-                                return true;
-                              })
-                              .toList();
-
-                          // Pastikan metode yang dipilih valid
-                          // Kita tidak bisa update state di sini, jadi kita pilih nilai tampilan
-                          String displaySelected = _selectedMethod;
-                          bool isValid = allowedMethods.any(
-                            (e) => e.key == _selectedMethod,
-                          );
-
-                          if (!isValid && allowedMethods.isNotEmpty) {
-                            displaySelected = allowedMethods.first.key;
-                            // Jadwalkan update state untuk mensinkronkan variabel
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              if (_selectedMethod != displaySelected) {
-                                setState(
-                                  () => _selectedMethod = displaySelected,
-                                );
-                              }
-                            });
-                          }
-
-                          return DropdownButtonFormField<String>(
-                            isExpanded: true,
-                            value: displaySelected,
-                            decoration: InputDecoration(
-                              hintText: 'Pilih sumber dana',
-                              prefixIcon: Icon(
-                                _paymentMethods[displaySelected]?['icon'] ??
-                                    Icons.payment,
-                                color: Colors.lightGreen.shade700,
-                              ),
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: isDarkMode
-                                      ? Colors.grey.shade700
-                                      : Colors.grey.shade300,
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: isDarkMode
-                                      ? Colors.grey.shade700
-                                      : Colors.grey.shade300,
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(12),
-                                borderSide: BorderSide(
-                                  color: Colors.lightGreen.shade700,
-                                  width: 2,
-                                ),
-                              ),
-                              filled: true,
-                              fillColor: isDarkMode
-                                  ? Colors.grey.shade800.withOpacity(0.3)
-                                  : Colors.grey.shade50,
-                            ),
-                            items: allowedMethods.map((entry) {
-                              String name = entry.value['name'];
-                              if (entry.key == 'balance') {
-                                final user = Provider.of<AuthProvider>(
+                            // Judul
+                            Text(
+                              'Tambah Tabungan 💰',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
                                   context,
-                                ).user;
-                                if (user != null) {
-                                  name +=
-                                      ' (${_currencyFormat.format(user.availableBalance)})';
-                                }
-                              }
-
-                              return DropdownMenuItem<String>(
-                                value: entry.key,
-                                child: Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.all(8),
-                                      decoration: BoxDecoration(
-                                        color: (entry.value['color'] as Color)
-                                            .withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Icon(
-                                        entry.value['icon'],
-                                        color: entry.value['color'],
-                                        size: 20,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Expanded(
-                                      child: Text(
-                                        name,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            }).toList(),
-                            onChanged: (val) =>
-                                setState(() => _selectedMethod = val!),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Field Catatan (Opsional)
-                      Text(
-                        'Catatan (Opsional)',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).textTheme.bodyLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      TextFormField(
-                        controller: _descCtrl,
-                        decoration: InputDecoration(
-                          hintText: 'Misal: Sisa uang jajan',
-                          prefixIcon: Icon(
-                            Icons.note_outlined,
-                            color: Colors.lightGreen.shade700,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: isDarkMode
-                                  ? Colors.grey.shade700
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide(
-                              color: Colors.lightGreen.shade700,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDarkMode
-                              ? Colors.grey.shade800.withOpacity(0.3)
-                              : Colors.grey.shade50,
-                        ),
-                        maxLines: 3,
-                        textCapitalization: TextCapitalization.sentences,
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Tombol Simpan Tabungan
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: _isLoading
-                            ? Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.green.shade700,
-                                      Colors.green.shade500,
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.green.shade700,
-                                      Colors.green.shade500,
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.green.shade200.withOpacity(
-                                        0.5,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: _submit,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Simpan Tabungan',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
+                                ).textTheme.titleLarge?.color,
                               ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Goal: ${widget.goalName}',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.green.shade700,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Field Nominal
+                            CurrencyInputField(
+                              label: 'Nominal Tabungan',
+                              controller: _amountCtrl,
+                              isDarkMode: isDarkMode,
+                              validator: Validators.validateAmount,
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Pilihan Sumber Dana
+                            Text(
+                              'Sumber Dana',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Builder(
+                              builder: (context) {
+                                final goals = Provider.of<GoalProvider>(
+                                  context,
+                                ).goals;
+
+                                // Safety check: jika goals sedang direfresh atau kosong
+                                if (goals.isEmpty) {
+                                  return const Center(
+                                    child: Padding(
+                                      padding: EdgeInsets.all(20),
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  );
+                                }
+
+                                // Cari goal dengan aman
+                                final goalIndex = goals.indexWhere(
+                                  (g) => g.id == widget.goalId,
+                                );
+                                if (goalIndex == -1) {
+                                  // Jika goal tidak ditemukan (misal dihapus atau sesi berubah)
+                                  return const Center(
+                                    child: Text('Goal tidak ditemukan'),
+                                  );
+                                }
+
+                                final goal = goals[goalIndex];
+                                print(
+                                  'DEBUG: DepositScreen Goal: ${goal.name}, Type: ${goal.type}, ID: ${goal.id}',
+                                );
+                                final isCashGoal = goal.type == 'cash';
+
+                                // Filter metode pembayaran yang sesuai
+                                final allowedMethods = _paymentMethods.entries
+                                    .where((entry) {
+                                      if (isCashGoal) {
+                                        return entry.key == 'manual';
+                                      } else {
+                                        // Goal digital: izinkan semua KECUALI manual
+                                        return entry.key != 'manual';
+                                      }
+                                    })
+                                    .where((entry) {
+                                      // Cek saldo jika sumber dana adalah 'balance'
+                                      if (entry.key == 'balance') {
+                                        final user = Provider.of<AuthProvider>(
+                                          context,
+                                        ).user;
+                                        return user != null &&
+                                            user.availableBalance > 0;
+                                      }
+                                      return true;
+                                    })
+                                    .toList();
+
+                                // Pastikan metode yang dipilih valid
+                                // Kita tidak bisa update state di sini, jadi kita pilih nilai tampilan
+                                String displaySelected = _selectedMethod;
+                                bool isValid = allowedMethods.any(
+                                  (e) => e.key == _selectedMethod,
+                                );
+
+                                if (!isValid && allowedMethods.isNotEmpty) {
+                                  displaySelected = allowedMethods.first.key;
+                                  // Jadwalkan update state untuk mensinkronkan variabel
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (_selectedMethod != displaySelected) {
+                                      setState(
+                                        () => _selectedMethod = displaySelected,
+                                      );
+                                    }
+                                  });
+                                }
+
+                                return DropdownButtonFormField<String>(
+                                  isExpanded: true,
+                                  value: displaySelected,
+                                  decoration: InputDecoration(
+                                    hintText: 'Pilih sumber dana',
+                                    prefixIcon: Icon(
+                                      _paymentMethods[displaySelected]?['icon'] ??
+                                          Icons.payment,
+                                      color: Colors.lightGreen.shade700,
+                                    ),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode
+                                            ? Colors.grey.shade700
+                                            : Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: isDarkMode
+                                            ? Colors.grey.shade700
+                                            : Colors.grey.shade300,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: Colors.lightGreen.shade700,
+                                        width: 2,
+                                      ),
+                                    ),
+                                    filled: true,
+                                    fillColor: isDarkMode
+                                        ? Colors.grey.shade800.withOpacity(0.3)
+                                        : Colors.grey.shade50,
+                                  ),
+                                  items: allowedMethods.map((entry) {
+                                    String name = entry.value['name'];
+                                    if (entry.key == 'balance') {
+                                      final user = Provider.of<AuthProvider>(
+                                        context,
+                                      ).user;
+                                      if (user != null) {
+                                        name +=
+                                            ' (${_currencyFormat.format(user.availableBalance)})';
+                                      }
+                                    }
+
+                                    return DropdownMenuItem<String>(
+                                      value: entry.key,
+                                      child: Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color:
+                                                  (entry.value['color']
+                                                          as Color)
+                                                      .withOpacity(0.1),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Icon(
+                                              entry.value['icon'],
+                                              color: entry.value['color'],
+                                              size: 20,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Expanded(
+                                            child: Text(
+                                              name,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: (val) =>
+                                      setState(() => _selectedMethod = val!),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Field Catatan (Opsional)
+                            Text(
+                              'Catatan (Opsional)',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodyLarge?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            TextFormField(
+                              controller: _descCtrl,
+                              decoration: InputDecoration(
+                                hintText: 'Misal: Sisa uang jajan',
+                                prefixIcon: Icon(
+                                  Icons.note_outlined,
+                                  color: Colors.lightGreen.shade700,
+                                ),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: isDarkMode
+                                        ? Colors.grey.shade700
+                                        : Colors.grey.shade300,
+                                  ),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: isDarkMode
+                                        ? Colors.grey.shade700
+                                        : Colors.grey.shade300,
+                                  ),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                  borderSide: BorderSide(
+                                    color: Colors.lightGreen.shade700,
+                                    width: 2,
+                                  ),
+                                ),
+                                filled: true,
+                                fillColor: isDarkMode
+                                    ? Colors.grey.shade800.withOpacity(0.3)
+                                    : Colors.grey.shade50,
+                              ),
+                              maxLines: 3,
+                              textCapitalization: TextCapitalization.sentences,
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Tombol Simpan Tabungan
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: _isLoading
+                                  ? Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.green.shade700,
+                                            Colors.green.shade500,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.green.shade700,
+                                            Colors.green.shade500,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.green.shade200
+                                                .withOpacity(0.5),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ElevatedButton(
+                                        onPressed: _submit,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Simpan Tabungan',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
           ],
         ),

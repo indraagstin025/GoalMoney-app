@@ -5,6 +5,7 @@ import 'package:flutter/material.dart' hide Badge;
 import 'package:provider/provider.dart';
 import '../../providers/badge_provider.dart';
 import '../../models/badge.dart';
+import '../../widgets/badge_skeleton.dart';
 
 /// Layar Koleksi Badge yang menampilkan semua pencapaian yang telah dan belum didapatkan.
 /// Menggunakan [TabBar] untuk memisahkan kategori badge "Diperoleh" dan "Belum Diperoleh".
@@ -66,7 +67,7 @@ class _BadgeScreenState extends State<BadgeScreen>
               child: Consumer<BadgeProvider>(
                 builder: (context, provider, _) {
                   if (provider.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const BadgeSkeleton();
                   }
 
                   return Column(

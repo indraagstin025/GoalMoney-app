@@ -10,6 +10,8 @@ import '../../providers/goal_provider.dart';
 import '../../providers/transaction_provider.dart';
 import '../auth/login_screen.dart';
 import '../about/about_app_screen.dart';
+import './change_password_screen.dart';
+import '../../widgets/profile_skeleton.dart';
 
 /// Layar Profil Pengguna.
 /// Memungkinkan pengguna melihat dan mengedit informasi profil, mengubah foto profil,
@@ -26,6 +28,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   late TextEditingController _emailCtrl;
   bool _isEditing = false;
   bool _isLoading = false;
+  bool _isInitializing = true;
   String? _profilePhotoPath;
 
   @override
@@ -35,6 +38,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _nameCtrl = TextEditingController(text: user?.name ?? '');
     _emailCtrl = TextEditingController(text: user?.email ?? '');
     _loadProfilePhoto();
+
+    // Simulasi inisialisasi singkat untuk menampilkan skeleton loading
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
+    });
   }
 
   /// Memuat path foto profil yang tersimpan secara lokal.
@@ -135,16 +145,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: user == null
-            ? const Center(child: CircularProgressIndicator())
-            : Column(
-                children: [
-                  // Custom Header like Dashboard
-                  _buildCustomHeader(context, isDarkMode),
+        child: Column(
+          children: [
+            // Custom Header like Dashboard
+            _buildCustomHeader(context, isDarkMode),
 
-                  // Main Content
-                  Expanded(
-                    child: SingleChildScrollView(
+            // Main Content
+            Expanded(
+              child: (user == null || _isInitializing)
+                  ? const ProfileSkeleton()
+                  : SingleChildScrollView(
                       padding: const EdgeInsets.all(24),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
@@ -171,9 +181,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -695,10 +705,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'Ubah Password',
                 isDarkMode: isDarkMode,
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Fitur ubah password akan segera tersedia'),
-                      behavior: SnackBarBehavior.floating,
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ChangePasswordScreen(),
                     ),
                   );
                 },

@@ -36,14 +36,14 @@ dependencies:
   # Share
   share_plus: ^10.0.0
 
-  # PDF & Excel Export
+  # PDF Export
   pdf: ^3.11.0
   printing: ^5.13.0
-  excel: ^4.0.6
   open_file: ^3.5.7
 
   # Charts
   fl_chart: ^0.69.2
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

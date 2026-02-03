@@ -1,16 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'providers/auth_provider.dart';
 import 'providers/goal_provider.dart';
 import 'providers/transaction_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/badge_provider.dart';
-import 'screens/auth/login_screen.dart';
-import 'screens/dashboard/dashboard_screen.dart';
 import 'screens/splash_screen.dart';
 import 'config/theme.dart';
-
-import 'package:firebase_core/firebase_core.dart';
 
 /// Global key untuk navigator, memungkinkan navigasi tanpa context.
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

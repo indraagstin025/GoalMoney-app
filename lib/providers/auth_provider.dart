@@ -151,30 +151,56 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Memperbarui profil secara lokal di SharedPreferences (untuk perubahan cepat di UI).
-  Future<void> updateProfile(String? name, String? email) async {
+  /// Memperbarui profil ke server dan sinkronisasi ke state lokal.
+  Future<void> updateProfile(String name, String email) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final response = await _apiClient.dio.post(
+        '/profile/update',
+        data: {'name': name, 'email': email},
+      );
 
-      if (name != null) await prefs.setString('profile_name', name);
-      if (email != null) await prefs.setString('profile_email', email);
-
-      // Perbarui objek user yang sedang aktif.
-      if (_user != null) {
+      if (response.statusCode == 200) {
+        final data = response.data['data'];
         _user = User(
-          id: _user!.id,
-          name: name ?? _user!.name,
-          email: email ?? _user!.email,
-          availableBalance: _user!.availableBalance,
+          id: data['id'],
+          name: data['name'],
+          email: data['email'],
+          availableBalance: _user?.availableBalance ?? 0,
         );
+
+        // Update SharedPreferences untuk backup lokal
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('profile_name', name);
+        await prefs.setString('profile_email', email);
+
         notifyListeners();
       }
-
-      print(
-        '[AuthProvider] Profil diperbarui secara lokal: name=$name, email=$email',
-      );
+    } on DioException catch (e) {
+      final message =
+          e.response?.data['message'] ?? 'Gagal memperbarui profil di server';
+      throw Exception(message);
     } catch (e) {
       throw Exception('Gagal memperbarui profil: $e');
+    }
+  }
+
+  /// Memperbarui password user di server.
+  Future<void> updatePassword(String oldPassword, String newPassword) async {
+    try {
+      final response = await _apiClient.dio.post(
+        '/profile/update-password',
+        data: {'old_password': oldPassword, 'new_password': newPassword},
+      );
+
+      if (response.statusCode == 200) {
+        print('[AuthProvider] Password berhasil diperbarui di server');
+      }
+    } on DioException catch (e) {
+      final message =
+          e.response?.data['message'] ?? 'Gagal memperbarui password';
+      throw Exception(message);
+    } catch (e) {
+      throw Exception('Gagal memperbarui password: $e');
     }
   }
 

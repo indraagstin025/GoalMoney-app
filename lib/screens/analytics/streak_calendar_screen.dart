@@ -2,10 +2,9 @@
 // UI untuk menampilkan streak calendar heatmap
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../../providers/goal_provider.dart';
 import '../../core/api_client.dart';
+import '../../widgets/analytics_skeleton.dart';
 
 /// Layar Kalender Streak yang menampilkan heatmap aktivitas menabung pengguna.
 /// Mirip dengan GitHub contribution graph, menunjukkan intensitas aktivitas harian.
@@ -110,7 +109,7 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
 
             Expanded(
               child: _isLoading
-                  ? const Center(child: CircularProgressIndicator())
+                  ? AnalyticsSkeleton.calendar()
                   : _error != null
                   ? Center(child: Text('Error: $_error'))
                   : RefreshIndicator(
@@ -373,7 +372,6 @@ class _StreakCalendarScreenState extends State<StreakCalendarScreen> {
           // Months grid
           ...List.generate(12, (monthIndex) {
             final month = monthIndex + 1;
-            final firstDay = DateTime(_selectedYear, month, 1);
             final lastDay = DateTime(_selectedYear, month + 1, 0);
             final daysInMonth = lastDay.day;
 

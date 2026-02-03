@@ -7,6 +7,7 @@ import '../../widgets/goal_card.dart';
 import '../../widgets/search_field.dart';
 import '../../widgets/goal_filter_sheet.dart';
 import 'add_goal_screen.dart';
+import '../../widgets/goal_list_skeleton.dart';
 
 /// Layar daftar goal.
 /// Menampilkan semua goal yang dimiliki pengguna, dibagi menjadi tab Cash dan E-Wallet.
@@ -125,8 +126,8 @@ class _GoalListScreenState extends State<GoalListScreen>
             Expanded(
               child: Consumer<GoalProvider>(
                 builder: (context, goalProvider, child) {
-                  if (goalProvider.isLoading) {
-                    return const Center(child: CircularProgressIndicator());
+                  if (goalProvider.isLoading && goalProvider.goals.isEmpty) {
+                    return const GoalListSkeleton();
                   }
 
                   // Terapkan filter pencarian pada list goal

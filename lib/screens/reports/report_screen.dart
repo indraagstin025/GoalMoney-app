@@ -10,10 +10,11 @@ import 'package:intl/intl.dart';
 import '../../providers/goal_provider.dart';
 import '../../models/report.dart';
 import '../../services/report_export_service.dart';
+import '../../widgets/report_skeleton.dart';
 
 /// Layar Laporan Tabungan yang menyajikan data statistik mendalam tentang progress user.
 /// Memungkinkan user untuk memfilter laporan berdasarkan periode (hari, minggu, bulan, tahun, atau kustom).
-/// User juga dapat mengekspor laporan ke format PDF, Excel, atau CSV.
+/// User juga dapat mengekspor laporan ke format PDF.
 class ReportScreen extends StatefulWidget {
   const ReportScreen({super.key});
 
@@ -372,104 +373,6 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
-  /// Mengekspor data laporan ke dalam file Excel (.xlsx).
-  Future<void> _exportToExcel(SavingsReport report) async {
-    if (_isExporting) return;
-
-    setState(() => _isExporting = true);
-
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-              SizedBox(width: 12),
-              Text('Membuat file Excel...'),
-            ],
-          ),
-          duration: Duration(seconds: 30),
-        ),
-      );
-
-      final file = await ReportExportService.exportToExcel(report);
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-      if (mounted) {
-        _showExportSuccessDialog('Excel', file.path);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal membuat Excel: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isExporting = false);
-      }
-    }
-  }
-
-  /// Mengekspor data laporan ke dalam format CSV.
-  Future<void> _exportToCsv(SavingsReport report) async {
-    if (_isExporting) return;
-
-    setState(() => _isExporting = true);
-
-    try {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Row(
-            children: [
-              SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              ),
-              SizedBox(width: 12),
-              Text('Membuat file CSV...'),
-            ],
-          ),
-          duration: Duration(seconds: 30),
-        ),
-      );
-
-      final file = await ReportExportService.exportToCsv(report);
-
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-      if (mounted) {
-        _showExportSuccessDialog('CSV', file.path);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Gagal membuat CSV: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        setState(() => _isExporting = false);
-      }
-    }
-  }
-
   /// Menampilkan dialog sukses setelah file laporan berhasil dibuat.
   void _showExportSuccessDialog(String type, String filePath) {
     showDialog(
@@ -544,16 +447,7 @@ class _ReportScreenState extends State<ReportScreen> {
               child: Consumer<GoalProvider>(
                 builder: (context, provider, _) {
                   if (provider.isLoadingReport) {
-                    return const Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          CircularProgressIndicator(),
-                          SizedBox(height: 16),
-                          Text('Memuat laporan...'),
-                        ],
-                      ),
-                    );
+                    return const ReportSkeleton();
                   }
 
                   final report = provider.report;
@@ -733,10 +627,6 @@ class _ReportScreenState extends State<ReportScreen> {
                           _copyReport(provider.report!);
                         } else if (value == 'pdf') {
                           _exportToPdf(provider.report!);
-                        } else if (value == 'excel') {
-                          _exportToExcel(provider.report!);
-                        } else if (value == 'csv') {
-                          _exportToCsv(provider.report!);
                         }
                       },
                       itemBuilder: (context) => [
@@ -747,26 +637,6 @@ class _ReportScreenState extends State<ReportScreen> {
                               Icon(Icons.picture_as_pdf, color: Colors.red),
                               SizedBox(width: 8),
                               Text('Export ke PDF'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'excel',
-                          child: Row(
-                            children: [
-                              Icon(Icons.table_chart, color: Colors.green),
-                              SizedBox(width: 8),
-                              Text('Export ke Excel'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'csv',
-                          child: Row(
-                            children: [
-                              Icon(Icons.text_snippet, color: Colors.blue),
-                              SizedBox(width: 8),
-                              Text('Export ke CSV'),
                             ],
                           ),
                         ),
@@ -1046,6 +916,7 @@ class _ReportScreenState extends State<ReportScreen> {
         statusColor = Colors.green;
         statusIcon = Icons.check_circle;
         break;
+      case 'active':
       case 'on_track':
         statusColor = Colors.blue;
         statusIcon = Icons.trending_up;
@@ -1057,6 +928,23 @@ class _ReportScreenState extends State<ReportScreen> {
       default:
         statusColor = Colors.grey;
         statusIcon = Icons.help;
+    }
+
+    // Terjemahkan status untuk tampilan
+    String displayStatus;
+    switch (goal.status.toLowerCase()) {
+      case 'completed':
+        displayStatus = 'Selesai';
+        break;
+      case 'active':
+      case 'on_track':
+        displayStatus = 'Dalam Progres';
+        break;
+      case 'behind':
+        displayStatus = 'Tertinggal';
+        break;
+      default:
+        displayStatus = goal.status;
     }
 
     return Container(
@@ -1100,7 +988,7 @@ class _ReportScreenState extends State<ReportScreen> {
                     Icon(statusIcon, size: 14, color: statusColor),
                     const SizedBox(width: 4),
                     Text(
-                      goal.status,
+                      displayStatus,
                       style: TextStyle(
                         color: statusColor,
                         fontSize: 12,

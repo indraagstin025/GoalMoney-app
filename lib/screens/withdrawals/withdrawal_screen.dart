@@ -9,6 +9,7 @@ import '../../widgets/badge_celebration_dialog.dart';
 import '../../widgets/currency_input_field.dart';
 import '../../widgets/withdrawal_header.dart';
 import '../../widgets/withdrawal_history_list.dart';
+import '../../widgets/withdrawal_skeleton.dart';
 
 /// Layar Penarikan Dana yang memungkinkan user untuk menarik saldo tabungan.
 /// Mendukung penarikan dari saldo akun umum atau dari goal tertentu yang sudah selesai.
@@ -80,6 +81,8 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     decimalDigits: 0,
   );
 
+  bool _isInitializing = true;
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +93,12 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
     );
     _tabController = TabController(length: 2, vsync: this);
     _fetchData();
+    // Simulasi inisialisasi singkat untuk menampilkan skeleton
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
+    });
   }
 
   @override
@@ -314,41 +323,54 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
             Future.microtask(() => Navigator.pop(ctx));
           }
 
-          return AlertDialog(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.shade100.withOpacity(0.3),
-                        Colors.green.shade50.withOpacity(0.3),
-                      ],
+          return PopScope(
+            canPop: false,
+            onPopInvoked: (didPop) {
+              if (didPop) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Tunggu proses selesai...'),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            },
+            child: AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.green.shade100.withOpacity(0.3),
+                          Colors.green.shade50.withOpacity(0.3),
+                        ],
+                      ),
+                      shape: BoxShape.circle,
                     ),
-                    shape: BoxShape.circle,
+                    child: const CircularProgressIndicator(
+                      strokeWidth: 3,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                    ),
                   ),
-                  child: const CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Memproses Penarikan...',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
-                ),
-                const SizedBox(height: 24),
-                const Text(
-                  'Memproses Penarikan...',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                const SizedBox(height: 8),
-                Text(
-                  'Mohon tunggu sebentar...',
-                  style: TextStyle(color: Colors.grey[600]),
-                ),
-              ],
+                  const SizedBox(height: 8),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Mohon tunggu sebentar...',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -362,62 +384,88 @@ class _WithdrawalScreenState extends State<WithdrawalScreen>
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Custom Header
-            WithdrawalHeader(isDarkMode: isDarkMode),
+      body: PopScope(
+        canPop: !_isLoading,
+        onPopInvoked: (didPop) {
+          if (didPop) return;
+          // Show snackbar if user tries to back while loading
+          if (_isLoading) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Tunggu proses selesai...'),
+                duration: Duration(seconds: 2),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          }
+        },
+        child: SafeArea(
+          child: Column(
+            children: [
+              // Custom Header
+              WithdrawalHeader(isDarkMode: isDarkMode),
 
-            // Overflow Title Override (if from overflow)
-            if (widget.fromOverflow)
-              Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                color: Theme.of(context).cardTheme.color,
-                child: const Center(
-                  child: Text(
-                    'Tarik Dana Overflow',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.green,
+              // Overflow Title Override (if from overflow)
+              if (widget.fromOverflow)
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  color: Theme.of(context).cardTheme.color,
+                  child: const Center(
+                    child: Text(
+                      'Tarik Dana Overflow',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
                   ),
                 ),
+
+              // Tab Bar
+              Container(
+                color: Theme.of(context).cardTheme.color,
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: Colors.green.shade700,
+                  indicatorWeight: 3,
+                  labelColor: Colors.green.shade700,
+                  unselectedLabelColor: isDarkMode
+                      ? Colors.grey.shade400
+                      : Colors.grey.shade600,
+                  labelStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  tabs: const [
+                    Tab(text: 'Request Penarikan'),
+                    Tab(text: 'Riwayat'),
+                  ],
+                ),
               ),
 
-            // Tab Bar
-            Container(
-              color: Theme.of(context).cardTheme.color,
-              child: TabBar(
-                controller: _tabController,
-                indicatorColor: Colors.green.shade700,
-                indicatorWeight: 3,
-                labelColor: Colors.green.shade700,
-                unselectedLabelColor: isDarkMode
-                    ? Colors.grey.shade400
-                    : Colors.grey.shade600,
-                labelStyle: const TextStyle(fontWeight: FontWeight.bold),
-                tabs: const [
-                  Tab(text: 'Request Penarikan'),
-                  Tab(text: 'Riwayat'),
-                ],
-              ),
-            ),
+              // Tab Content
+              Expanded(
+                child: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    // Tab 1: Request Form
+                    Consumer<GoalProvider>(
+                      builder: (context, goalProvider, _) {
+                        // FIX: Only show skeleton during initial entry OR if goals are completely empty while loading
+                        if (_isInitializing ||
+                            (goalProvider.isLoading &&
+                                goalProvider.goals.isEmpty)) {
+                          return WithdrawalSkeleton.form();
+                        }
+                        return _buildRequestTab(isDarkMode);
+                      },
+                    ),
 
-            // Tab Content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  // Tab 1: Request Form
-                  _buildRequestTab(isDarkMode),
-
-                  // Tab 2: History
-                  _buildHistoryTab(isDarkMode),
-                ],
+                    // Tab 2: History
+                    _buildHistoryTab(isDarkMode),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

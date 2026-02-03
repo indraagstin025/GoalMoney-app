@@ -259,8 +259,10 @@ class GoalProvider with ChangeNotifier {
 
   /// Mengambil data ringkasan untuk dashboard (total saldo, target, user info, dll).
   Future<void> fetchDashboardSummary() async {
+    _isLoading = true;
+    _dashboardSummary = null; // Bersihkan data lama
+    notifyListeners();
     try {
-      _dashboardSummary = null; // Bersihkan data lama
       final response = await _apiClient.dio.get('/dashboard/summary');
       if (response.statusCode == 200) {
         _dashboardSummary = response.data['data'];
@@ -280,11 +282,12 @@ class GoalProvider with ChangeNotifier {
             );
           }
         }
-
-        notifyListeners();
       }
     } on DioException catch (e) {
       print('Gagal mengambil summary dashboard: ${e.message}');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
@@ -329,6 +332,8 @@ class GoalProvider with ChangeNotifier {
 
   /// Mengambil riwayat penarikan dana.
   Future<void> fetchWithdrawalHistory({String? status}) async {
+    _isLoading = true;
+    notifyListeners();
     try {
       print('[GoalProvider] Mengambil riwayat penarikan');
       final Map<String, dynamic> queryParams = {};
@@ -358,13 +363,15 @@ class GoalProvider with ChangeNotifier {
         print(
           '[GoalProvider] Berhasil mengambil ${_withdrawals.length} riwayat penarikan',
         );
-        notifyListeners();
       }
     } on DioException catch (e) {
       print('[GoalProvider] Error saat mengambil penarikan: ${e.message}');
       throw Exception(
         e.response?.data['message'] ?? 'Gagal mengambil riwayat penarikan',
       );
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
   }
 

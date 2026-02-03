@@ -7,6 +7,7 @@ import '../../widgets/badge_celebration_dialog.dart';
 import '../../core/photo_storage_service.dart';
 import '../../providers/goal_provider.dart';
 import '../../widgets/deadline_picker_field.dart';
+import '../../widgets/goal_form_skeleton.dart';
 
 /// Layar untuk menambahkan goal baru.
 /// Pengguna dapat memasukkan nama, target jumlah, tipe goal, deadline, deskripsi, dan foto goal.
@@ -28,6 +29,18 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
   DateTime? _selectedDeadline;
   final _dateFormat = DateFormat('yyyy-MM-dd');
   final _displayDateFormat = DateFormat('dd MMM yyyy');
+  bool _isInitializing = true;
+
+  @override
+  void initState() {
+    super.initState();
+    // Simulasi inisialisasi singkat untuk menampilkan skeleton loading
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
+    });
+  }
 
   /// Memilih foto goal dari galeri atau kamera.
   Future<void> _pickGoalPhoto() async {
@@ -180,239 +193,245 @@ class _AddGoalScreenState extends State<AddGoalScreen> {
 
             // Konten Utama Form
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
+              child: _isInitializing
+                  ? const GoalFormSkeleton()
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 20),
 
-                      // Judul Halaman
-                      Text(
-                        'Buat Goal Baru 🎯',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).textTheme.titleLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tetapkan target tabungan Anda',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: isDarkMode
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Bagian Foto Goal
-                      Center(
-                        child: _GoalPhotoPicker(
-                          photoPath: _goalPhotoPath,
-                          onTap: _pickGoalPhoto,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Input Nama Goal
-                      _InputField(
-                        label: 'Nama Goal',
-                        controller: _nameCtrl,
-                        hint: 'Contoh: Laptop Baru, Liburan, dll',
-                        icon: Icons.flag_rounded,
-                        isDarkMode: isDarkMode,
-                        textCapitalization: TextCapitalization.words,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Nama goal tidak boleh kosong';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Input Target Jumlah
-                      CurrencyInputField(
-                        label: 'Target Jumlah',
-                        controller: _targetCtrl,
-                        isDarkMode: isDarkMode,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Target jumlah tidak boleh kosong';
-                          }
-                          final numericValue = value.replaceAll(
-                            RegExp('[^0-9]'),
-                            '',
-                          );
-                          if (numericValue.isEmpty ||
-                              int.parse(numericValue) <= 0) {
-                            return 'Target harus lebih dari 0';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Dropdown Tipe Goal
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Tipe Tabungan',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Theme.of(
-                                context,
-                              ).textTheme.bodyLarge?.color,
+                            // Judul Halaman
+                            Text(
+                              'Buat Goal Baru 🎯',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.titleLarge?.color,
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(12),
-                              color: isDarkMode
-                                  ? Colors.grey.shade800.withOpacity(0.3)
-                                  : Colors.grey.shade50,
-                              border: Border.all(
+                            const SizedBox(height: 8),
+                            Text(
+                              'Tetapkan target tabungan Anda',
+                              style: TextStyle(
+                                fontSize: 15,
                                 color: isDarkMode
-                                    ? Colors.grey.shade700
-                                    : Colors.grey.shade300,
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
                               ),
                             ),
-                            child: DropdownButtonFormField<String>(
-                              value: _selectedType,
-                              isExpanded: true, // Fix overflow text
-                              decoration: const InputDecoration(
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 12,
-                                ),
-                                border: InputBorder.none,
-                                prefixIcon: Icon(Icons.category_rounded),
+                            const SizedBox(height: 32),
+
+                            // Bagian Foto Goal
+                            Center(
+                              child: _GoalPhotoPicker(
+                                photoPath: _goalPhotoPath,
+                                onTap: _pickGoalPhoto,
                               ),
-                              items: const [
-                                DropdownMenuItem(
-                                  value: 'digital',
-                                  child: Text(
-                                    'Tabungan Digital (E-Wallet/Bank)',
-                                    overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Input Nama Goal
+                            _InputField(
+                              label: 'Nama Goal',
+                              controller: _nameCtrl,
+                              hint: 'Contoh: Laptop Baru, Liburan, dll',
+                              icon: Icons.flag_rounded,
+                              isDarkMode: isDarkMode,
+                              textCapitalization: TextCapitalization.words,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Nama goal tidak boleh kosong';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Input Target Jumlah
+                            CurrencyInputField(
+                              label: 'Target Jumlah',
+                              controller: _targetCtrl,
+                              isDarkMode: isDarkMode,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Target jumlah tidak boleh kosong';
+                                }
+                                final numericValue = value.replaceAll(
+                                  RegExp('[^0-9]'),
+                                  '',
+                                );
+                                if (numericValue.isEmpty ||
+                                    int.parse(numericValue) <= 0) {
+                                  return 'Target harus lebih dari 0';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Dropdown Tipe Goal
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Tipe Tabungan',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w600,
+                                    color: Theme.of(
+                                      context,
+                                    ).textTheme.bodyLarge?.color,
                                   ),
                                 ),
-                                DropdownMenuItem(
-                                  value: 'cash',
-                                  child: Text(
-                                    'Celengan Tunai (Uang Fisik)',
-                                    overflow: TextOverflow.ellipsis,
+                                const SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(12),
+                                    color: isDarkMode
+                                        ? Colors.grey.shade800.withOpacity(0.3)
+                                        : Colors.grey.shade50,
+                                    border: Border.all(
+                                      color: isDarkMode
+                                          ? Colors.grey.shade700
+                                          : Colors.grey.shade300,
+                                    ),
+                                  ),
+                                  child: DropdownButtonFormField<String>(
+                                    value: _selectedType,
+                                    isExpanded: true, // Fix overflow text
+                                    decoration: const InputDecoration(
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      border: InputBorder.none,
+                                      prefixIcon: Icon(Icons.category_rounded),
+                                    ),
+                                    items: const [
+                                      DropdownMenuItem(
+                                        value: 'digital',
+                                        child: Text(
+                                          'Tabungan Digital (E-Wallet/Bank)',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      DropdownMenuItem(
+                                        value: 'cash',
+                                        child: Text(
+                                          'Celengan Tunai (Uang Fisik)',
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                    onChanged: (value) {
+                                      if (value != null) {
+                                        setState(() => _selectedType = value);
+                                      }
+                                    },
                                   ),
                                 ),
                               ],
-                              onChanged: (value) {
-                                if (value != null) {
-                                  setState(() => _selectedType = value);
-                                }
-                              },
                             ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
+                            const SizedBox(height: 20),
 
-                      // Input Deadline (Optional)
-                      DeadlinePickerField(
-                        selectedDate: _selectedDeadline,
-                        displayFormat: _displayDateFormat,
-                        isDarkMode: isDarkMode,
-                        onTap: _selectDeadline,
-                        onClear: () => setState(() => _selectedDeadline = null),
-                      ),
-                      const SizedBox(height: 20),
+                            // Input Deadline (Optional)
+                            DeadlinePickerField(
+                              selectedDate: _selectedDeadline,
+                              displayFormat: _displayDateFormat,
+                              isDarkMode: isDarkMode,
+                              onTap: _selectDeadline,
+                              onClear: () =>
+                                  setState(() => _selectedDeadline = null),
+                            ),
+                            const SizedBox(height: 20),
 
-                      // Input Deskripsi (Optional)
-                      _InputField(
-                        label: 'Deskripsi (Opsional)',
-                        controller: _descCtrl,
-                        hint: 'Tambahkan deskripsi goal Anda...',
-                        icon: Icons.description_outlined,
-                        isDarkMode: isDarkMode,
-                        maxLines: 3,
-                        textCapitalization: TextCapitalization.sentences,
-                      ),
-                      const SizedBox(height: 32),
+                            // Input Deskripsi (Optional)
+                            _InputField(
+                              label: 'Deskripsi (Opsional)',
+                              controller: _descCtrl,
+                              hint: 'Tambahkan deskripsi goal Anda...',
+                              icon: Icons.description_outlined,
+                              isDarkMode: isDarkMode,
+                              maxLines: 3,
+                              textCapitalization: TextCapitalization.sentences,
+                            ),
+                            const SizedBox(height: 32),
 
-                      // Tombol Submit (Buat Goal)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: _isLoading
-                            ? Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.green.shade700,
-                                      Colors.green.shade500,
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              )
-                            : Container(
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    colors: [
-                                      Colors.green.shade700,
-                                      Colors.green.shade500,
-                                    ],
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                  ),
-                                  borderRadius: BorderRadius.circular(12),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.green.shade200.withOpacity(
-                                        0.5,
+                            // Tombol Submit (Buat Goal)
+                            SizedBox(
+                              width: double.infinity,
+                              height: 56,
+                              child: _isLoading
+                                  ? Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.green.shade700,
+                                            Colors.green.shade500,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
                                       ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 4),
+                                      child: const Center(
+                                        child: CircularProgressIndicator(
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [
+                                            Colors.green.shade700,
+                                            Colors.green.shade500,
+                                          ],
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.green.shade200
+                                                .withOpacity(0.5),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: ElevatedButton(
+                                        onPressed: _submit,
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.transparent,
+                                          shadowColor: Colors.transparent,
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text(
+                                          'Buat Goal',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
                                     ),
-                                  ],
-                                ),
-                                child: ElevatedButton(
-                                  onPressed: _submit,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.transparent,
-                                    shadowColor: Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                  ),
-                                  child: const Text(
-                                    'Buat Goal',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
           ],
         ),

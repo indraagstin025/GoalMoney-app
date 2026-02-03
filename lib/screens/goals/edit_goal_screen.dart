@@ -6,6 +6,7 @@ import '../../models/goal.dart';
 import '../../providers/goal_provider.dart';
 import '../../widgets/deadline_picker_field.dart';
 import '../../core/photo_storage_service.dart';
+import '../../widgets/goal_form_skeleton.dart';
 
 /// Layar untuk mengedit goal yang sudah ada.
 /// Memungkinkan pengguna mengubah nama, target jumlah, deskripsi, foto, dan deadline goal.
@@ -29,6 +30,8 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
   final _dateFormat = DateFormat('yyyy-MM-dd');
   final _displayDateFormat = DateFormat('dd MMM yyyy');
 
+  bool _isInitializing = true;
+
   @override
   void initState() {
     super.initState();
@@ -44,6 +47,13 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
     if (widget.goal.deadline != null) {
       _selectedDeadline = DateTime.parse(widget.goal.deadline!);
     }
+
+    // Simulasi inisialisasi singkat untuk menampilkan skeleton loading
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) {
+        setState(() => _isInitializing = false);
+      }
+    });
   }
 
   @override
@@ -171,212 +181,222 @@ class _EditGoalScreenState extends State<EditGoalScreen> {
 
             // Konten Utama
             Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(24.0),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const SizedBox(height: 20),
+              child: _isInitializing
+                  ? const GoalFormSkeleton()
+                  : SingleChildScrollView(
+                      padding: const EdgeInsets.all(24.0),
+                      child: Form(
+                        key: _formKey,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 20),
 
-                      // Judul
-                      Text(
-                        'Edit Goal ✏️',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).textTheme.titleLarge?.color,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Perbarui informasi goal Anda',
-                        style: TextStyle(
-                          fontSize: 15,
-                          color: isDarkMode
-                              ? Colors.grey.shade400
-                              : Colors.grey.shade600,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Bagian Foto
-                      Center(
-                        child: _GoalPhotoPicker(
-                          photoPath: _goalPhotoPath,
-                          onTap: _pickGoalPhoto,
-                        ),
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Field Nama Goal
-                      _InputField(
-                        label: 'Nama Goal',
-                        controller: _nameCtrl,
-                        hint: 'Contoh: Laptop Baru, Liburan, dll',
-                        icon: Icons.flag_rounded,
-                        isDarkMode: isDarkMode,
-                        textCapitalization: TextCapitalization.words,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Nama goal tidak boleh kosong';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Field Target Jumlah
-                      CurrencyInputField(
-                        label: 'Target Jumlah',
-                        controller: _targetCtrl,
-                        isDarkMode: isDarkMode,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Target jumlah tidak boleh kosong';
-                          }
-                          final numericValue = value.replaceAll(
-                            RegExp('[^0-9]'),
-                            '',
-                          );
-                          if (numericValue.isEmpty ||
-                              int.parse(numericValue) <= 0) {
-                            return 'Target harus lebih dari 0';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Field Deadline (Opsional)
-                      DeadlinePickerField(
-                        selectedDate: _selectedDeadline,
-                        displayFormat: _displayDateFormat,
-                        isDarkMode: isDarkMode,
-                        onTap: _selectDeadline,
-                        onClear: () => setState(() => _selectedDeadline = null),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Field Deskripsi
-                      _InputField(
-                        label: 'Deskripsi (Opsional)',
-                        controller: _descCtrl,
-                        hint: 'Tambahkan deskripsi goal Anda...',
-                        icon: Icons.description_outlined,
-                        isDarkMode: isDarkMode,
-                        maxLines: 3,
-                        textCapitalization: TextCapitalization.sentences,
-                      ),
-                      const SizedBox(height: 32),
-
-                      // Tombol Aksi
-                      Row(
-                        children: [
-                          // Tombol Batal
-                          Expanded(
-                            child: SizedBox(
-                              height: 56,
-                              child: OutlinedButton(
-                                onPressed: () => Navigator.of(context).pop(),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: Colors.grey.shade400,
-                                    width: 1.5,
-                                  ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                ),
-                                child: Text(
-                                  'Batal',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDarkMode
-                                        ? Colors.grey.shade300
-                                        : Colors.grey.shade700,
-                                  ),
-                                ),
+                            // Judul
+                            Text(
+                              'Edit Goal ✏️',
+                              style: TextStyle(
+                                fontSize: 28,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.titleLarge?.color,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 16),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Perbarui informasi goal Anda',
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: isDarkMode
+                                    ? Colors.grey.shade400
+                                    : Colors.grey.shade600,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
 
-                          // Tombol Simpan
-                          Expanded(
-                            flex: 2,
-                            child: SizedBox(
-                              height: 56,
-                              child: _isLoading
-                                  ? Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.green.shade700,
-                                            Colors.green.shade500,
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
+                            // Bagian Foto
+                            Center(
+                              child: _GoalPhotoPicker(
+                                photoPath: _goalPhotoPath,
+                                onTap: _pickGoalPhoto,
+                              ),
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Field Nama Goal
+                            _InputField(
+                              label: 'Nama Goal',
+                              controller: _nameCtrl,
+                              hint: 'Contoh: Laptop Baru, Liburan, dll',
+                              icon: Icons.flag_rounded,
+                              isDarkMode: isDarkMode,
+                              textCapitalization: TextCapitalization.words,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Nama goal tidak boleh kosong';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Field Target Jumlah
+                            CurrencyInputField(
+                              label: 'Target Jumlah',
+                              controller: _targetCtrl,
+                              isDarkMode: isDarkMode,
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Target jumlah tidak boleh kosong';
+                                }
+                                final numericValue = value.replaceAll(
+                                  RegExp('[^0-9]'),
+                                  '',
+                                );
+                                if (numericValue.isEmpty ||
+                                    int.parse(numericValue) <= 0) {
+                                  return 'Target harus lebih dari 0';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Field Deadline (Opsional)
+                            DeadlinePickerField(
+                              selectedDate: _selectedDeadline,
+                              displayFormat: _displayDateFormat,
+                              isDarkMode: isDarkMode,
+                              onTap: _selectDeadline,
+                              onClear: () =>
+                                  setState(() => _selectedDeadline = null),
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Field Deskripsi
+                            _InputField(
+                              label: 'Deskripsi (Opsional)',
+                              controller: _descCtrl,
+                              hint: 'Tambahkan deskripsi goal Anda...',
+                              icon: Icons.description_outlined,
+                              isDarkMode: isDarkMode,
+                              maxLines: 3,
+                              textCapitalization: TextCapitalization.sentences,
+                            ),
+                            const SizedBox(height: 32),
+
+                            // Tombol Aksi
+                            Row(
+                              children: [
+                                // Tombol Batal
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 56,
+                                    child: OutlinedButton(
+                                      onPressed: () =>
+                                          Navigator.of(context).pop(),
+                                      style: OutlinedButton.styleFrom(
+                                        side: BorderSide(
+                                          color: Colors.grey.shade400,
+                                          width: 1.5,
                                         ),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: const Center(
-                                        child: CircularProgressIndicator(
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    )
-                                  : Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [
-                                            Colors.green.shade700,
-                                            Colors.green.shade500,
-                                          ],
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.green.shade200
-                                                .withOpacity(0.5),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 4),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(
+                                            12,
                                           ),
-                                        ],
-                                      ),
-                                      child: ElevatedButton(
-                                        onPressed: _submit,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: Colors.transparent,
-                                          shadowColor: Colors.transparent,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              12,
-                                            ),
-                                          ),
                                         ),
-                                        child: const Text(
-                                          'Update Goal',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
+                                      ),
+                                      child: Text(
+                                        'Batal',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDarkMode
+                                              ? Colors.grey.shade300
+                                              : Colors.grey.shade700,
                                         ),
                                       ),
                                     ),
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+
+                                // Tombol Simpan
+                                Expanded(
+                                  flex: 2,
+                                  child: SizedBox(
+                                    height: 56,
+                                    child: _isLoading
+                                        ? Container(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Colors.green.shade700,
+                                                  Colors.green.shade500,
+                                                ],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                            ),
+                                            child: const Center(
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          )
+                                        : Container(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: [
+                                                  Colors.green.shade700,
+                                                  Colors.green.shade500,
+                                                ],
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(12),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.green.shade200
+                                                      .withOpacity(0.5),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 4),
+                                                ),
+                                              ],
+                                            ),
+                                            child: ElevatedButton(
+                                              onPressed: _submit,
+                                              style: ElevatedButton.styleFrom(
+                                                backgroundColor:
+                                                    Colors.transparent,
+                                                shadowColor: Colors.transparent,
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius:
+                                                      BorderRadius.circular(12),
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'Update Goal',
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    ),
             ),
           ],
         ),

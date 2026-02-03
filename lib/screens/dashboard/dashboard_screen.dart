@@ -17,6 +17,7 @@ import '../../providers/badge_provider.dart';
 import '../../widgets/badge_celebration_dialog.dart';
 import '../analytics/analytics_screen.dart';
 import '../../widgets/swipeable_summary_cards.dart';
+import '../../widgets/dashboard_skeleton.dart';
 
 /// Layar Dashboard Utama.
 /// Menampilkan ringkasan keuangan, daftar badge terbaru, dan menu pintasan ke fitur utama.
@@ -127,134 +128,138 @@ class _DashboardScreenState extends State<DashboardScreen>
               _buildCustomHeader(user, context),
 
               Expanded(
-                child: SingleChildScrollView(
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Kartu Ringkasan (Saldo, Progres, dll)
-                      if (summary != null)
-                        _buildSummaryCard(summary, currency, user),
+                child: goalProvider.isLoading && summary == null
+                    ? const DashboardSkeleton()
+                    : SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 10,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Kartu Ringkasan (Saldo, Progres, dll)
+                            if (summary != null)
+                              _buildSummaryCard(summary, currency, user),
 
-                      const SizedBox(height: 24),
+                            const SizedBox(height: 24),
 
-                      // Bagian Showcase Badge
-                      _buildBadgeShowcase(context),
+                            // Bagian Showcase Badge
+                            _buildBadgeShowcase(context),
 
-                      const SizedBox(height: 32),
+                            const SizedBox(height: 32),
 
-                      // Judul Menu
-                      Text(
-                        'Menu',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).textTheme.titleLarge?.color,
+                            // Judul Menu
+                            Text(
+                              'Menu',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.titleLarge?.color,
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+
+                            // Grid Menu Pintasan
+                            GridView.count(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              crossAxisCount: 3,
+                              mainAxisSpacing: 16,
+                              crossAxisSpacing: 16,
+                              children: [
+                                _buildShortcutItem(
+                                  context,
+                                  icon: Icons.list_alt_rounded,
+                                  label: 'My Goals',
+                                  color: Colors.purple,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const GoalListScreen(),
+                                    ),
+                                  ),
+                                ),
+                                _buildShortcutItem(
+                                  context,
+                                  icon: Icons.add_circle_outline_rounded,
+                                  label: 'Add Goal',
+                                  color: Colors.blue,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const AddGoalScreen(),
+                                    ),
+                                  ),
+                                ),
+                                _buildShortcutItem(
+                                  context,
+                                  icon: Icons.account_balance_wallet_rounded,
+                                  label: 'Withdraw',
+                                  color: Colors.orange,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const WithdrawalScreen(),
+                                    ),
+                                  ),
+                                ),
+                                _buildShortcutItem(
+                                  context,
+                                  icon: Icons.emoji_events_rounded,
+                                  label: 'Badges',
+                                  color: Colors.amber,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const BadgeScreen(),
+                                    ),
+                                  ),
+                                ),
+                                _buildShortcutItem(
+                                  context,
+                                  icon: Icons.assessment_rounded,
+                                  label: 'Laporan',
+                                  color: Colors.green,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ReportScreen(),
+                                    ),
+                                  ),
+                                ),
+                                _buildShortcutItem(
+                                  context,
+                                  icon: Icons.analytics_rounded,
+                                  label: 'Analytics',
+                                  color: Colors.indigo,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const AnalyticsScreen(),
+                                    ),
+                                  ),
+                                ),
+                                _buildShortcutItem(
+                                  context,
+                                  icon: Icons.person_rounded,
+                                  label: 'Profile',
+                                  color: Colors.teal,
+                                  onTap: () => Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (_) => const ProfileScreen(),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-
-                      // Grid Menu Pintasan
-                      GridView.count(
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        crossAxisCount: 3,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        children: [
-                          _buildShortcutItem(
-                            context,
-                            icon: Icons.list_alt_rounded,
-                            label: 'My Goals',
-                            color: Colors.purple,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const GoalListScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildShortcutItem(
-                            context,
-                            icon: Icons.add_circle_outline_rounded,
-                            label: 'Add Goal',
-                            color: Colors.blue,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AddGoalScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildShortcutItem(
-                            context,
-                            icon: Icons.account_balance_wallet_rounded,
-                            label: 'Withdraw',
-                            color: Colors.orange,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const WithdrawalScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildShortcutItem(
-                            context,
-                            icon: Icons.emoji_events_rounded,
-                            label: 'Badges',
-                            color: Colors.amber,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const BadgeScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildShortcutItem(
-                            context,
-                            icon: Icons.assessment_rounded,
-                            label: 'Laporan',
-                            color: Colors.green,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ReportScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildShortcutItem(
-                            context,
-                            icon: Icons.analytics_rounded,
-                            label: 'Analytics',
-                            color: Colors.indigo,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const AnalyticsScreen(),
-                              ),
-                            ),
-                          ),
-                          _buildShortcutItem(
-                            context,
-                            icon: Icons.person_rounded,
-                            label: 'Profile',
-                            color: Colors.teal,
-                            onTap: () => Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const ProfileScreen(),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
               ),
             ],
           ),
