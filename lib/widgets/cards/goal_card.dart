@@ -3,11 +3,11 @@ import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
 
-import '../providers/goal_provider.dart';
-import 'deadline_badge.dart';
-import '../screens/goals/goal_detail_screen.dart';
-import '../screens/goals/edit_goal_screen.dart';
-import '../screens/goals/deposit_screen.dart';
+import '../../providers/goal_provider.dart';
+import '../goals/deadline_badge.dart';
+import '../../screens/goals/goal_detail_screen.dart';
+import '../../screens/goals/edit_goal_screen.dart';
+import '../../screens/goals/deposit_screen.dart';
 
 /// Widget Kartu Goal yang menampilkan ringkasan informasi sebuah goal.
 /// Menampilkan gambar, nama, progress, nominal terkumpul, dan menu aksi (edit, delete, deposit).

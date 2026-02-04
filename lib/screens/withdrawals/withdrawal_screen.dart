@@ -5,11 +5,11 @@ import '../../providers/goal_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/validators.dart';
 import '../../providers/badge_provider.dart';
-import '../../widgets/badge_celebration_dialog.dart';
-import '../../widgets/currency_input_field.dart';
-import '../../widgets/withdrawal_header.dart';
-import '../../widgets/withdrawal_history_list.dart';
-import '../../widgets/withdrawal_skeleton.dart';
+import '../../widgets/dialogs/badge_celebration_dialog.dart';
+import '../../widgets/inputs/currency_input_field.dart';
+import '../../widgets/withdrawals/withdrawal_header.dart';
+import '../../widgets/withdrawals/withdrawal_history_list.dart';
+import '../../widgets/skeletons/withdrawal_skeleton.dart';
 
 /// Layar Penarikan Dana yang memungkinkan user untuk menarik saldo tabungan.
 /// Mendukung penarikan dari saldo akun umum atau dari goal tertentu yang sudah selesai.

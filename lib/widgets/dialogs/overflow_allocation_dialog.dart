@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/goal_provider.dart';
-import '../providers/auth_provider.dart';
-import '../models/goal.dart';
-import '../providers/badge_provider.dart';
-import '../widgets/badge_celebration_dialog.dart';
-import '../screens/withdrawals/withdrawal_screen.dart';
+import '../../providers/goal_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../models/goal.dart';
+import '../../providers/badge_provider.dart';
+import 'badge_celebration_dialog.dart';
+import '../../screens/withdrawals/withdrawal_screen.dart';
 
 /// Dialog untuk mengalokasikan sisa dana (overflow) saat sebuah target goal tercapai.
 /// Memungkinkan pengguna untuk membagi kelebihan uang ke goal lain yang belum selesai

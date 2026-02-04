@@ -6,7 +6,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
 import 'streak_calendar_screen.dart';
-import '../../widgets/analytics_skeleton.dart';
+import '../../widgets/skeletons/analytics_skeleton.dart';
 
 /// Layar Dashboard Analitik yang menampilkan statistik tabungan dalam bentuk grafik.
 /// Menggunakan paket `fl_chart` untuk visualisasi data tren, progress, dan distribusi.

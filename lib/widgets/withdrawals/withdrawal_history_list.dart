@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
-import '../providers/goal_provider.dart';
-import '../widgets/withdrawal_skeleton.dart';
+import '../../providers/goal_provider.dart';
+import '../skeletons/withdrawal_skeleton.dart';
 
 /// Widget yang menampilkan daftar riwayat penarikan dana (Withdrawal).
 /// Mengambil data dari `GoalProvider` dan menampilkannya dalam bentuk list kartu.

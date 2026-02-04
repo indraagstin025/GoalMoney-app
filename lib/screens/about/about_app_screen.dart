@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../widgets/about_skeleton.dart';
+import '../../widgets/skeletons/about_skeleton.dart';
 
 /// Layar "Tentang Aplikasi" yang memberikan informasi detail mengenai GoalMoney.
 /// Menampilkan deskripsi aplikasi, tujuan, fitur unggulan, tim pembuat, dan versi aplikasi.

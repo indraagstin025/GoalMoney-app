@@ -3,7 +3,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../core/validators.dart';
-import '../../widgets/auth_skeleton.dart';
+import '../../widgets/skeletons/auth_skeleton.dart';
 
 /// Layar Registrasi untuk pendaftaran pengguna baru.
 /// Memerlukan Nama Lengkap, Email, Password, dan Konfirmasi Password.

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/validators.dart';
-import '../../widgets/password_skeleton.dart';
+import '../../widgets/skeletons/password_skeleton.dart';
 
 /// Layar untuk mengubah password pengguna.
 /// Memerlukan verifikasi password lama sebelum menetapkan password baru.

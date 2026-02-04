@@ -11,7 +11,7 @@ import '../../providers/transaction_provider.dart';
 import '../auth/login_screen.dart';
 import '../about/about_app_screen.dart';
 import './change_password_screen.dart';
-import '../../widgets/profile_skeleton.dart';
+import '../../widgets/skeletons/profile_skeleton.dart';
 
 /// Layar Profil Pengguna.
 /// Memungkinkan pengguna melihat dan mengedit informasi profil, mengubah foto profil,

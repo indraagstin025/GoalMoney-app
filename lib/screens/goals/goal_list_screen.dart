@@ -3,11 +3,11 @@ import 'package:provider/provider.dart';
 
 import '../../providers/goal_provider.dart';
 import '../../models/goal_filter_state.dart';
-import '../../widgets/goal_card.dart';
-import '../../widgets/search_field.dart';
-import '../../widgets/goal_filter_sheet.dart';
+import '../../widgets/cards/goal_card.dart';
+import '../../widgets/inputs/search_field.dart';
+import '../../widgets/goals/goal_filter_sheet.dart';
 import 'add_goal_screen.dart';
-import '../../widgets/goal_list_skeleton.dart';
+import '../../widgets/skeletons/goal_list_skeleton.dart';
 
 /// Layar daftar goal.
 /// Menampilkan semua goal yang dimiliki pengguna, dibagi menjadi tab Cash dan E-Wallet.

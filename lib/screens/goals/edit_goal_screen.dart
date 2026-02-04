@@ -4,9 +4,9 @@ import 'package:intl/intl.dart';
 import 'dart:io';
 import '../../models/goal.dart';
 import '../../providers/goal_provider.dart';
-import '../../widgets/deadline_picker_field.dart';
+import '../../widgets/inputs/deadline_picker_field.dart';
 import '../../core/photo_storage_service.dart';
-import '../../widgets/goal_form_skeleton.dart';
+import '../../widgets/skeletons/goal_form_skeleton.dart';
 
 /// Layar untuk mengedit goal yang sudah ada.
 /// Memungkinkan pengguna mengubah nama, target jumlah, deskripsi, foto, dan deadline goal.

@@ -7,6 +7,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
 import 'package:intl/intl.dart';
 import 'package:open_file/open_file.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/report.dart';
 
 /// Service untuk mengekspor laporan keuangan ke format PDF.
@@ -24,6 +25,36 @@ class ReportExportService {
   /// Mengekspor objek [SavingsReport] ke file PDF.
   /// Mencakup header, ringkasan, daftar goal, pencapaian, badge, tips, dan riwayat transaksi.
   static Future<File> exportToPdf(SavingsReport report) async {
+    final pdfBytes = await _generatePdfBytes(report);
+
+    // Save file ke documents directory
+    final directory = await getApplicationDocumentsDirectory();
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final file = File('${directory.path}/Laporan_GoalMoney_$timestamp.pdf');
+    await file.writeAsBytes(pdfBytes);
+
+    return file;
+  }
+
+  /// Mengekspor PDF dan membuka Share Sheet agar user bisa pilih tujuan (Save to Files, Drive, dll).
+  /// Mengembalikan path file yang dibuat.
+  static Future<String> exportToPdfWithShareDialog(SavingsReport report) async {
+    // Generate dan simpan file sementara
+    final file = await exportToPdf(report);
+    
+    // Buka share sheet agar user bisa pilih lokasi simpan
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: 'Laporan GoalMoney',
+      text: 'Laporan Keuangan GoalMoney',
+    );
+    
+    return file.path;
+  }
+
+
+  /// Menghasilkan bytes PDF dari report.
+  static Future<List<int>> _generatePdfBytes(SavingsReport report) async {
     final pdf = pw.Document();
 
     // Tambahkan halaman multi-page yang mendukung konten panjang.
@@ -66,14 +97,9 @@ class ReportExportService {
       ),
     );
 
-    // Save file
-    final directory = await getApplicationDocumentsDirectory();
-    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
-    final file = File('${directory.path}/Laporan_GoalMoney_$timestamp.pdf');
-    await file.writeAsBytes(await pdf.save());
-
-    return file;
+    return pdf.save();
   }
+
 
   static pw.Widget _buildPdfHeader(SavingsReport report) {
     return pw.Container(

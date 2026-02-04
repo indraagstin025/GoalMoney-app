@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart' hide Badge;
-import '../models/badge.dart';
+import '../../models/badge.dart';
 
 /// Dialog perayaan saat pengguna mendapatkan badge baru.
 /// Menampilkan satu per satu badge yang diperoleh dengan animasi yang menarik.

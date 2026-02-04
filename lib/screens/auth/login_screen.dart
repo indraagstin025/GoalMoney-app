@@ -8,7 +8,7 @@ import '../../providers/transaction_provider.dart';
 import '../../core/validators.dart';
 import '../dashboard/dashboard_screen.dart';
 import 'register_screen.dart';
-import '../../widgets/auth_skeleton.dart';
+import '../../widgets/skeletons/auth_skeleton.dart';
 
 /// Layar Login untuk autentikasi pengguna.
 /// Memungkinkan pengguna masuk menggunakan email dan password.

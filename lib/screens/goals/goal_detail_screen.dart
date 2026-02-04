@@ -6,6 +6,7 @@ import '../../utils/date_helper.dart';
 import '../../models/goal.dart';
 import '../../providers/transaction_provider.dart';
 import '../../providers/goal_provider.dart';
+import '../../widgets/skeletons/goal_detail_skeleton.dart';
 
 /// Layar detail goal.
 /// Menampilkan informasi detail tentang goal, termasuk progres, foto, riwayat transaksi, dan perkiraan (forecast).
@@ -100,11 +101,18 @@ class _GoalDetailScreenState extends State<GoalDetailScreen> {
                 },
                 child: Consumer<TransactionProvider>(
                   builder: (context, transactionProvider, _) {
+                    // Tampilkan skeleton saat pertama kali loading
+                    if (transactionProvider.isLoading && 
+                        transactionProvider.transactions.isEmpty) {
+                      return const GoalDetailSkeleton();
+                    }
+                    
                     return SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Column(
                         children: [
                           const SizedBox(height: 20),
+
 
                           // Foto Goal
                           if (_imageExists && _goalImage != null)
@@ -811,17 +819,21 @@ class _ForecastSection extends StatelessWidget {
                       child: Icon(icon, color: color, size: 20),
                     ),
                     const SizedBox(width: 12),
-                    const Text(
-                      'Prediksi Goal Intelligence',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.bold,
+                    Flexible(
+                      child: Text(
+                        'Prediksi Goal',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const Spacer(),
+                    const SizedBox(width: 8),
                     _buildStatusChip(status, color),
                   ],
                 ),
+
                 const SizedBox(height: 16),
                 Text(
                   forecast['description'] ?? '',

@@ -4,7 +4,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/api_client.dart';
-import '../../widgets/analytics_skeleton.dart';
+import '../../widgets/skeletons/analytics_skeleton.dart';
 
 /// Layar Kalender Streak yang menampilkan heatmap aktivitas menabung pengguna.
 /// Mirip dengan GitHub contribution graph, menunjukkan intensitas aktivitas harian.

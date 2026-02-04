@@ -5,9 +5,9 @@ import '../../providers/goal_provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../core/validators.dart';
 import '../../providers/badge_provider.dart';
-import '../../widgets/badge_celebration_dialog.dart';
-import '../../widgets/overflow_allocation_dialog.dart';
-import '../../widgets/deposit_form_skeleton.dart';
+import '../../widgets/dialogs/badge_celebration_dialog.dart';
+import '../../widgets/dialogs/overflow_allocation_dialog.dart';
+import '../../widgets/skeletons/deposit_form_skeleton.dart';
 
 /// Layar untuk menambahkan tabungan (deposit) ke dalam goal.
 /// Mendukung berbagai metode pembayaran dan menangani skenario goal tercapai atau overflow.

@@ -3,11 +3,11 @@ import 'package:provider/provider.dart';
 import 'dart:io';
 import 'package:intl/intl.dart';
 import '../../providers/badge_provider.dart';
-import '../../widgets/badge_celebration_dialog.dart';
+import '../../widgets/dialogs/badge_celebration_dialog.dart';
 import '../../core/photo_storage_service.dart';
 import '../../providers/goal_provider.dart';
-import '../../widgets/deadline_picker_field.dart';
-import '../../widgets/goal_form_skeleton.dart';
+import '../../widgets/inputs/deadline_picker_field.dart';
+import '../../widgets/skeletons/goal_form_skeleton.dart';
 
 /// Layar untuk menambahkan goal baru.
 /// Pengguna dapat memasukkan nama, target jumlah, tipe goal, deadline, deskripsi, dan foto goal.

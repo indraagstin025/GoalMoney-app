@@ -10,7 +10,7 @@ import 'package:intl/intl.dart';
 import '../../providers/goal_provider.dart';
 import '../../models/report.dart';
 import '../../services/report_export_service.dart';
-import '../../widgets/report_skeleton.dart';
+import '../../widgets/skeletons/report_skeleton.dart';
 
 /// Layar Laporan Tabungan yang menyajikan data statistik mendalam tentang progress user.
 /// Memungkinkan user untuk memfilter laporan berdasarkan periode (hari, minggu, bulan, tahun, atau kustom).
@@ -52,6 +52,13 @@ class _ReportScreenState extends State<ReportScreen> {
       _applyFilter(_selectedFilter);
     });
   }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
 
   /// Menerapkan filter periode yang dipilih dan menerjemahkannya ke rentang tanggal.
   void _applyFilter(String filter) {
@@ -155,11 +162,7 @@ class _ReportScreenState extends State<ReportScreen> {
     return buffer.toString();
   }
 
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
+
 
   /// Menampilkan pemilih rentang tanggal kustom (Date Range Picker).
   void _showCustomRangePicker() async {
@@ -325,6 +328,7 @@ class _ReportScreenState extends State<ReportScreen> {
   }
 
   /// Mengekspor data laporan ke dalam file PDF.
+  /// User dapat memilih lokasi penyimpanan file.
   Future<void> _exportToPdf(SavingsReport report) async {
     if (_isExporting) return;
 
@@ -351,13 +355,15 @@ class _ReportScreenState extends State<ReportScreen> {
         ),
       );
 
-      final file = await ReportExportService.exportToPdf(report);
+      // Menggunakan share dialog agar user bisa pilih lokasi simpan (Google Drive, Files, dll)
+      final filePath = await ReportExportService.exportToPdfWithShareDialog(report);
 
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
 
       if (mounted) {
-        _showExportSuccessDialog('PDF', file.path);
+        _showExportSuccessDialog('PDF', filePath);
       }
+
     } catch (e) {
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -373,6 +379,7 @@ class _ReportScreenState extends State<ReportScreen> {
     }
   }
 
+
   /// Menampilkan dialog sukses setelah file laporan berhasil dibuat.
   void _showExportSuccessDialog(String type, String filePath) {
     showDialog(
@@ -383,32 +390,16 @@ class _ReportScreenState extends State<ReportScreen> {
           children: [
             Icon(Icons.check_circle, color: Colors.green, size: 28),
             const SizedBox(width: 8),
-            Text('$type Berhasil Dibuat'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('File laporan telah berhasil dibuat.'),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
+            Flexible(
               child: Text(
-                filePath,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: Colors.grey[700],
-                  fontFamily: 'monospace',
-                ),
+                '$type Berhasil Disimpan',
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ],
         ),
+
+        content: const Text('File laporan telah berhasil disimpan.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
